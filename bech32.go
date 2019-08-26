@@ -1,9 +1,4 @@
-// Copyright (c) 2017 The btcsuite developers
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file
-// on github.com/btcsuite/btcutil/bech32.
-
-package bech32
+package lnurl
 
 import (
 	"fmt"

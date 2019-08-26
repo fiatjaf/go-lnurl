@@ -1,6 +1,9 @@
-package bech32
+package lnurl
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 func LNURLDecode(lnurl string) (url string, err error) {
 	tag, data, err := Decode(lnurl)
@@ -30,5 +33,5 @@ func LNURLEncode(actualurl string) (lnurl string, err error) {
 	}
 
 	lnurl, err = Encode("lnurl", converted)
-	return
+	return strings.ToUpper(lnurl), err
 }
