@@ -14,14 +14,48 @@ func ErrorResponse(reason string) LNURLResponse {
 	return LNURLResponse{Status: "ERROR", Reason: reason}
 }
 
-// The response a service must return when a wallet scans an lnurl-withdraw QR code.
-// Must include Status: "OK".
+type LNURLParams interface {
+	LNURLKind() string
+}
+
+type LNURLChannelResponse struct {
+	LNURLResponse
+	Tag      string `json:"tag"`
+	K1       string `json:"k1"`
+	Callback string `json:"callback"`
+	URI      string `json:"uri"`
+}
+
+func (_ LNURLChannelResponse) LNURLKind() string { return "lnurl-channel" }
+
 type LNURLWithdrawResponse struct {
-	Callback           string `json:"callback"`
+	LNURLResponse
+	Tag                string `json:"tag"`
 	K1                 string `json:"k1"`
+	Callback           string `json:"callback"`
 	MaxWithdrawable    int64  `json:"maxWithdrawable"`
 	MinWithdrawable    int64  `json:"minWithdrawable"`
 	DefaultDescription string `json:"defaultDescription"`
-	Tag                string `json:"tag"`
-	LNURLResponse
 }
+
+func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
+
+type LNURLPayResponse struct {
+	LNURLResponse
+	Tag         string      `json:"tag"`
+	MaxSendable int64       `json:"maxWithdrawable"`
+	MinSendable int64       `json:"minWithdrawable"`
+	Routes      interface{} `json:"routes"`
+	PR          string      `json:"pr"`
+	Metadata    string      `json:"metadata"`
+}
+
+func (_ LNURLPayResponse) LNURLKind() string { return "lnurl-pay" }
+
+type LNURLLoginParams struct {
+	Tag      string
+	K1       string
+	Callback string
+}
+
+func (_ LNURLLoginParams) LNURLKind() string { return "lnurl-login" }
