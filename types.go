@@ -52,10 +52,11 @@ type LNURLPayResponse struct {
 
 func (_ LNURLPayResponse) LNURLKind() string { return "lnurl-pay" }
 
-type LNURLLoginParams struct {
+type LNURLAuthParams struct {
 	Tag      string
 	K1       string
 	Callback string
+	Host     string
 }
 
-func (_ LNURLLoginParams) LNURLKind() string { return "lnurl-login" }
+func (_ LNURLAuthParams) LNURLKind() string { return "lnurl-auth" }

@@ -1,9 +1,11 @@
 package lnurl
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -73,10 +75,11 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 	query := parsed.Query()
 
 	if query.Get("tag") == "login" {
-		return LNURLLoginParams{
+		return LNURLAuthParams{
 			Tag:      "login",
 			K1:       query.Get("k1"),
 			Callback: rawurl,
+			Host:     parsed.Host,
 		}, nil
 	} else {
 		resp, err := http.Get(rawurl)
@@ -124,4 +127,18 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 			return nil, errors.New("unknown response tag " + j.Get("tag").String())
 		}
 	}
+}
+
+// RandomK1 returns a 32-byte random hex-encoded string for usage as k1 in lnurl-auth and anywhere else.
+func RandomK1() string {
+	hex := []rune("0123456789abcdef")
+	b := make([]rune, 32)
+	for i := range b {
+		r, err := rand.Int(rand.Reader, big.NewInt(16))
+		if err != nil {
+			return ""
+		}
+		b[i] = hex[r.Int64()]
+	}
+	return string(b)
 }

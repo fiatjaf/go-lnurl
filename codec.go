@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
 func LNURLDecode(lnurl string) (url string, err error) {
 	tag, data, err := Decode(lnurl)
 	if err != nil {
@@ -25,6 +26,7 @@ func LNURLDecode(lnurl string) (url string, err error) {
 	return
 }
 
+// LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
 func LNURLEncode(actualurl string) (lnurl string, err error) {
 	asbytes := []byte(actualurl)
 	converted, err := ConvertBits(asbytes, 8, 5, true)
