@@ -75,9 +75,14 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 	query := parsed.Query()
 
 	if query.Get("tag") == "login" {
+		k1 := query.Get("k1")
+		if _, err := hex.DecodeString(k1); err != nil || len(k1) != 64 {
+			return nil, errors.New("k1 is not a valid 32-byte hex-encoded string.")
+		}
+
 		return LNURLAuthParams{
 			Tag:      "login",
-			K1:       query.Get("k1"),
+			K1:       k1,
 			Callback: rawurl,
 			Host:     parsed.Host,
 		}, nil
@@ -99,17 +104,35 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 		switch j.Get("tag").String() {
 		case "channelRequest":
+			k1 := j.Get("k1").String()
+			if k1 == "" {
+				return nil, errors.New("k1 is blank")
+			}
+			callback := j.Get("callback").String()
+			if urlp, err := url.Parse(callback); err != nil || urlp.Scheme != "https" {
+				return nil, errors.New("callback is not a valid HTTPS URL")
+			}
+
 			return LNURLChannelResponse{
 				Tag:      "channelRequest",
-				K1:       j.Get("k1").String(),
-				Callback: j.Get("callback").String(),
+				K1:       k1,
+				Callback: callback,
 				URI:      j.Get("uri").String(),
 			}, nil
 		case "withdrawRequest":
+			k1 := j.Get("k1").String()
+			if k1 == "" {
+				return nil, errors.New("k1 is blank")
+			}
+			callback := j.Get("callback").String()
+			if urlp, err := url.Parse(callback); err != nil || urlp.Scheme != "https" {
+				return nil, errors.New("callback is not a valid HTTPS URL")
+			}
+
 			return LNURLWithdrawResponse{
 				Tag:                "withdrawRequest",
-				K1:                 j.Get("k1").String(),
-				Callback:           j.Get("callback").String(),
+				K1:                 k1,
+				Callback:           callback,
 				MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
 				MinWithdrawable:    j.Get("minWithdrawable").Int(),
 				DefaultDescription: j.Get("defaultDescription").String(),
@@ -132,7 +155,7 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 // RandomK1 returns a 32-byte random hex-encoded string for usage as k1 in lnurl-auth and anywhere else.
 func RandomK1() string {
 	hex := []rune("0123456789abcdef")
-	b := make([]rune, 32)
+	b := make([]rune, 64)
 	for i := range b {
 		r, err := rand.Int(rand.Reader, big.NewInt(16))
 		if err != nil {
