@@ -40,17 +40,23 @@ type LNURLWithdrawResponse struct {
 
 func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
 
-type LNURLPayResponse struct {
+type LNURLPayResponse1 struct {
 	LNURLResponse
-	Tag         string      `json:"tag"`
-	MaxSendable int64       `json:"maxWithdrawable"`
-	MinSendable int64       `json:"minWithdrawable"`
-	Routes      interface{} `json:"routes"`
-	PR          string      `json:"pr"`
-	Metadata    string      `json:"metadata"`
+	Callback        string `json:"callback"`
+	Tag             string `json:"tag"`
+	MaxSendable     int64  `json:"maxWithdrawable"`
+	MinSendable     int64  `json:"minWithdrawable"`
+	EncodedMetadata string `json:"metadata"`
+	Metadata        [][]string
 }
 
-func (_ LNURLPayResponse) LNURLKind() string { return "lnurl-pay" }
+type LNURLPayResponse2 struct {
+	LNURLResponse
+	Routes []interface{} `json:"routes,omitempty"`
+	PR     string        `json:"pr"`
+}
+
+func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
 
 type LNURLAuthParams struct {
 	Tag      string
