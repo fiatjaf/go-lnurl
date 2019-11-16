@@ -84,7 +84,8 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 				return nil, errors.New("k1 is blank")
 			}
 			callback := j.Get("callback").String()
-			if urlp, err := url.Parse(callback); err != nil || urlp.Scheme != "https" {
+			callbackURL, err := url.Parse(callback)
+			if err != nil || callbackURL.Scheme != "https" {
 				return nil, errors.New("callback is not a valid HTTPS URL")
 			}
 
@@ -92,6 +93,7 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 				Tag:                "withdrawRequest",
 				K1:                 k1,
 				Callback:           callback,
+				CallbackURL:        callbackURL,
 				MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
 				MinWithdrawable:    j.Get("minWithdrawable").Int(),
 				DefaultDescription: j.Get("defaultDescription").String(),
@@ -101,17 +103,26 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 			var metadata [][]string
 			err := json.Unmarshal([]byte(strmetadata), &metadata)
 			if err != nil {
-				return LNURLPayResponse1{}, err
+				return nil, err
+			}
+
+			callback := j.Get("callback").String()
+			callbackURL, err := url.Parse(callback)
+			if err != nil || callbackURL.Scheme != "https" {
+				return nil, errors.New("callback is not a valid HTTPS URL")
 			}
 
 			return LNURLPayResponse1{
-				Tag:         "payRequest",
-				Metadata:    metadata,
-				MaxSendable: j.Get("maxSendable").Int(),
-				MinSendable: j.Get("minSendable").Int(),
+				Tag:             "payRequest",
+				Callback:        callback,
+				CallbackURL:     callbackURL,
+				EncodedMetadata: strmetadata,
+				Metadata:        metadata,
+				MaxSendable:     j.Get("maxSendable").Int(),
+				MinSendable:     j.Get("minSendable").Int(),
 			}, nil
 		default:
-			return nil, errors.New("unknown response tag " + j.Get("tag").String())
+			return nil, errors.New("unknown response tag " + j.String())
 		}
 	}
 }
