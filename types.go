@@ -18,6 +18,25 @@ func ErrorResponse(reason string) LNURLResponse {
 	return LNURLResponse{Status: "ERROR", Reason: reason}
 }
 
+func Action(text string, url string) SuccessAction {
+	if url == "" {
+		return SuccessAction{
+			Tag:         "message",
+			Description: text,
+		}
+	}
+
+	return SuccessAction{
+		Tag:         "message",
+		Description: text,
+		Data:        url,
+	}
+}
+
+func NoAction() SuccessAction {
+	return SuccessAction{Tag: "noop"}
+}
+
 type LNURLParams interface {
 	LNURLKind() string
 }
@@ -58,13 +77,20 @@ type LNURLPayResponse1 struct {
 
 type LNURLPayResponse2 struct {
 	LNURLResponse
-	Routes [][]RouteInfo `json:"routes"`
-	PR     string        `json:"pr"`
+	SuccessAction SuccessAction `json:"successAction"`
+	Routes        [][]RouteInfo `json:"routes"`
+	PR            string        `json:"pr"`
 }
 
 type RouteInfo struct {
 	NodeId        string `json:"nodeId"`
 	ChannelUpdate string `json:"channelUpdate"`
+}
+
+type SuccessAction struct {
+	Tag         string `json:"tag"`
+	Description string `json:"description,omitempty"`
+	Data        string `json:"data,omitempty"`
 }
 
 func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
