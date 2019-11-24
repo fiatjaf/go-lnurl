@@ -21,15 +21,15 @@ func ErrorResponse(reason string) LNURLResponse {
 func Action(text string, url string) SuccessAction {
 	if url == "" {
 		return SuccessAction{
-			Tag:         "message",
-			Description: text,
+			Tag:     "message",
+			Message: text,
 		}
 	}
 
 	return SuccessAction{
 		Tag:         "message",
 		Description: text,
-		Data:        url,
+		URL:         url,
 	}
 }
 
@@ -90,7 +90,8 @@ type RouteInfo struct {
 type SuccessAction struct {
 	Tag         string `json:"tag"`
 	Description string `json:"description,omitempty"`
-	Data        string `json:"data,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
