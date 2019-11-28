@@ -6,7 +6,7 @@ import (
 
 // The base response for all lnurl calls.
 type LNURLResponse struct {
-	Status string `json:"status"`
+	Status string `json:"status,omitempty"`
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -77,9 +77,9 @@ type LNURLPayResponse1 struct {
 
 type LNURLPayResponse2 struct {
 	LNURLResponse
-	SuccessAction SuccessAction `json:"successAction"`
-	Routes        [][]RouteInfo `json:"routes"`
-	PR            string        `json:"pr"`
+	SuccessAction *SuccessAction `json:"successAction,omitempty"`
+	Routes        [][]RouteInfo  `json:"routes"`
+	PR            string         `json:"pr"`
 }
 
 type RouteInfo struct {
