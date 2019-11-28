@@ -43,10 +43,11 @@ type LNURLParams interface {
 
 type LNURLChannelResponse struct {
 	LNURLResponse
-	Tag      string `json:"tag"`
-	K1       string `json:"k1"`
-	Callback string `json:"callback"`
-	URI      string `json:"uri"`
+	Tag         string   `json:"tag"`
+	K1          string   `json:"k1"`
+	Callback    string   `json:"callback"`
+	CallbackURL *url.URL `json:"-"`
+	URI         string   `json:"uri"`
 }
 
 func (_ LNURLChannelResponse) LNURLKind() string { return "lnurl-channel" }

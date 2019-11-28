@@ -68,15 +68,17 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 				return nil, errors.New("k1 is blank")
 			}
 			callback := j.Get("callback").String()
-			if urlp, err := url.Parse(callback); err != nil || urlp.Scheme != "https" {
-				return nil, errors.New("callback is not a valid HTTPS URL")
+			callbackURL, err := url.Parse(callback)
+			if err != nil {
+				return nil, errors.New("callback is not a valid URL")
 			}
 
 			return LNURLChannelResponse{
-				Tag:      "channelRequest",
-				K1:       k1,
-				Callback: callback,
-				URI:      j.Get("uri").String(),
+				Tag:         "channelRequest",
+				K1:          k1,
+				Callback:    callback,
+				CallbackURL: callbackURL,
+				URI:         j.Get("uri").String(),
 			}, nil
 		case "withdrawRequest":
 			k1 := j.Get("k1").String()
@@ -85,8 +87,8 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 			}
 			callback := j.Get("callback").String()
 			callbackURL, err := url.Parse(callback)
-			if err != nil || callbackURL.Scheme != "https" {
-				return nil, errors.New("callback is not a valid HTTPS URL")
+			if err != nil {
+				return nil, errors.New("callback is not a valid URL")
 			}
 
 			return LNURLWithdrawResponse{
@@ -108,8 +110,8 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 			callback := j.Get("callback").String()
 			callbackURL, err := url.Parse(callback)
-			if err != nil || callbackURL.Scheme != "https" {
-				return nil, errors.New("callback is not a valid HTTPS URL")
+			if err != nil {
+				return nil, errors.New("callback is not a valid URL")
 			}
 
 			return LNURLPayResponse1{
