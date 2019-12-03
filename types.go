@@ -1,6 +1,7 @@
 package lnurl
 
 import (
+	"encoding/base64"
 	"net/url"
 )
 
@@ -18,23 +19,39 @@ func ErrorResponse(reason string) LNURLResponse {
 	return LNURLResponse{Status: "ERROR", Reason: reason}
 }
 
-func Action(text string, url string) SuccessAction {
+func Action(text string, url string) *SuccessAction {
 	if url == "" {
-		return SuccessAction{
+		return &SuccessAction{
 			Tag:     "message",
 			Message: text,
 		}
 	}
 
-	return SuccessAction{
+	return &SuccessAction{
 		Tag:         "message",
 		Description: text,
 		URL:         url,
 	}
 }
 
-func NoAction() SuccessAction {
-	return SuccessAction{Tag: "noop"}
+func NoAction() *SuccessAction {
+	return &SuccessAction{Tag: "noop"}
+}
+
+func AESAction(description string, preimage []byte, content string) (*SuccessAction, error) {
+	plaintext := []byte(content)
+
+	ciphertext, iv, err := AESCipher(preimage, plaintext)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SuccessAction{
+		Tag:         "aes",
+		Description: description,
+		Ciphertext:  base64.StdEncoding.EncodeToString(ciphertext),
+		IV:          base64.StdEncoding.EncodeToString(iv),
+	}, nil
 }
 
 type LNURLParams interface {
@@ -93,6 +110,27 @@ type SuccessAction struct {
 	Description string `json:"description,omitempty"`
 	URL         string `json:"url,omitempty"`
 	Message     string `json:"message,omitempty"`
+	Ciphertext  string `json:"ciphertext,omitempty"`
+	IV          string `json:"iv,omitempty"`
+}
+
+func (sa *SuccessAction) Decipher(preimage []byte) (content string, err error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(sa.Ciphertext)
+	if err != nil {
+		return
+	}
+
+	iv, err := base64.StdEncoding.DecodeString(sa.IV)
+	if err != nil {
+		return
+	}
+
+	plaintext, err := AESDecipher(preimage, ciphertext, iv)
+	if err != nil {
+		return
+	}
+
+	return string(plaintext), nil
 }
 
 func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
