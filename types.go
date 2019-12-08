@@ -28,7 +28,7 @@ func Action(text string, url string) *SuccessAction {
 	}
 
 	return &SuccessAction{
-		Tag:         "message",
+		Tag:         "url",
 		Description: text,
 		URL:         url,
 	}
