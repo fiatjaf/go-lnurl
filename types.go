@@ -34,10 +34,6 @@ func Action(text string, url string) *SuccessAction {
 	}
 }
 
-func NoAction() *SuccessAction {
-	return &SuccessAction{Tag: "noop"}
-}
-
 func AESAction(description string, preimage []byte, content string) (*SuccessAction, error) {
 	plaintext := []byte(content)
 
