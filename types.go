@@ -91,7 +91,7 @@ type LNURLPayResponse1 struct {
 
 type LNURLPayResponse2 struct {
 	LNURLResponse
-	SuccessAction *SuccessAction `json:"successAction,omitempty"`
+	SuccessAction *SuccessAction `json:"successAction"`
 	Routes        [][]RouteInfo  `json:"routes"`
 	PR            string         `json:"pr"`
 }
