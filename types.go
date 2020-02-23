@@ -80,13 +80,14 @@ func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
 
 type LNURLPayResponse1 struct {
 	LNURLResponse
-	Callback        string     `json:"callback"`
-	CallbackURL     *url.URL   `json:"-"`
-	Tag             string     `json:"tag"`
-	MaxSendable     int64      `json:"maxSendable"`
-	MinSendable     int64      `json:"minSendable"`
-	EncodedMetadata string     `json:"metadata"`
-	Metadata        [][]string `json:"-"`
+	Callback        string            `json:"callback"`
+	CallbackURL     *url.URL          `json:"-"`
+	Tag             string            `json:"tag"`
+	MaxSendable     int64             `json:"maxSendable"`
+	MinSendable     int64             `json:"minSendable"`
+	EncodedMetadata string            `json:"metadata"`
+	Metadata        [][]string        `json:"-"`
+	ParsedMetadata  map[string]string `json:"-"`
 }
 
 type LNURLPayResponse2 struct {
@@ -94,6 +95,7 @@ type LNURLPayResponse2 struct {
 	SuccessAction *SuccessAction `json:"successAction"`
 	Routes        [][]RouteInfo  `json:"routes"`
 	PR            string         `json:"pr"`
+	Disposable    bool           `json:"disposable,omitempty"`
 }
 
 type RouteInfo struct {

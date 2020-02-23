@@ -114,12 +114,18 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 				return nil, errors.New("callback is not a valid URL")
 			}
 
+			parsedMetadata := make(map[string]string)
+			for _, pair := range metadata {
+				parsedMetadata[pair[0]] = pair[1]
+			}
+
 			return LNURLPayResponse1{
 				Tag:             "payRequest",
 				Callback:        callback,
 				CallbackURL:     callbackURL,
 				EncodedMetadata: strmetadata,
 				Metadata:        metadata,
+				ParsedMetadata:  parsedMetadata,
 				MaxSendable:     j.Get("maxSendable").Int(),
 				MinSendable:     j.Get("minSendable").Int(),
 			}, nil
