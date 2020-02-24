@@ -90,10 +90,6 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 		switch j.Get("tag").String() {
 		case "withdrawRequest":
-			k1 := j.Get("k1").String()
-			if k1 == "" {
-				return nil, errors.New("k1 is blank")
-			}
 			callback := j.Get("callback").String()
 			callbackURL, err := url.Parse(callback)
 			if err != nil {
@@ -102,7 +98,7 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 			return LNURLWithdrawResponse{
 				Tag:                "withdrawRequest",
-				K1:                 k1,
+				K1:                 j.Get("k1").String(),
 				Callback:           callback,
 				CallbackURL:        callbackURL,
 				MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
