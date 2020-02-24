@@ -4,9 +4,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/tidwall/gjson"
 )
@@ -33,7 +35,8 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 	query := parsed.Query()
 
-	if query.Get("tag") == "login" {
+	switch query.Get("tag") {
+	case "login":
 		k1 := query.Get("k1")
 		if _, err := hex.DecodeString(k1); err != nil || len(k1) != 64 {
 			return nil, errors.New("k1 is not a valid 32-byte hex-encoded string.")
@@ -45,7 +48,31 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 			Callback: rawurl,
 			Host:     parsed.Host,
 		}, nil
-	} else {
+	case "withdrawRequest":
+		callback := query.Get("callback")
+		callbackURL, err := url.Parse(callback)
+		if err != nil {
+			return nil, fmt.Errorf("'callback' is not a valid URL: %w", err)
+		}
+		maxWithdrawable, err := strconv.ParseInt(query.Get("maxWithdrawable"), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("'maxWithdrawable' is not a valid integer: %w", err)
+		}
+		minWithdrawable, err := strconv.ParseInt(query.Get("minWithdrawable"), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("'minWithdrawable' is not a valid integer: %w", err)
+		}
+
+		return LNURLWithdrawResponse{
+			Tag:                "withdrawRequest",
+			K1:                 query.Get("k1"),
+			Callback:           callback,
+			CallbackURL:        callbackURL,
+			MaxWithdrawable:    maxWithdrawable,
+			MinWithdrawable:    minWithdrawable,
+			DefaultDescription: query.Get("defaultDescription"),
+		}, nil
+	default:
 		resp, err := http.Get(rawurl)
 		if err != nil {
 			return nil, err
@@ -62,24 +89,6 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 		}
 
 		switch j.Get("tag").String() {
-		case "channelRequest":
-			k1 := j.Get("k1").String()
-			if k1 == "" {
-				return nil, errors.New("k1 is blank")
-			}
-			callback := j.Get("callback").String()
-			callbackURL, err := url.Parse(callback)
-			if err != nil {
-				return nil, errors.New("callback is not a valid URL")
-			}
-
-			return LNURLChannelResponse{
-				Tag:         "channelRequest",
-				K1:          k1,
-				Callback:    callback,
-				CallbackURL: callbackURL,
-				URI:         j.Get("uri").String(),
-			}, nil
 		case "withdrawRequest":
 			k1 := j.Get("k1").String()
 			if k1 == "" {
@@ -128,6 +137,24 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 				ParsedMetadata:  parsedMetadata,
 				MaxSendable:     j.Get("maxSendable").Int(),
 				MinSendable:     j.Get("minSendable").Int(),
+			}, nil
+		case "channelRequest":
+			k1 := j.Get("k1").String()
+			if k1 == "" {
+				return nil, errors.New("k1 is blank")
+			}
+			callback := j.Get("callback").String()
+			callbackURL, err := url.Parse(callback)
+			if err != nil {
+				return nil, errors.New("callback is not a valid URL")
+			}
+
+			return LNURLChannelResponse{
+				Tag:         "channelRequest",
+				K1:          k1,
+				Callback:    callback,
+				CallbackURL: callbackURL,
+				URI:         j.Get("uri").String(),
 			}, nil
 		default:
 			return nil, errors.New("unknown response tag " + j.String())
