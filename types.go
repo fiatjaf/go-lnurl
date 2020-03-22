@@ -5,6 +5,13 @@ import (
 	"net/url"
 )
 
+var (
+	f     bool  = false
+	t     bool  = true
+	FALSE *bool = &f
+	TRUE  *bool = &t
+)
+
 // The base response for all lnurl calls.
 type LNURLResponse struct {
 	Status string `json:"status,omitempty"`
@@ -95,7 +102,7 @@ type LNURLPayResponse2 struct {
 	SuccessAction *SuccessAction `json:"successAction"`
 	Routes        [][]RouteInfo  `json:"routes"`
 	PR            string         `json:"pr"`
-	Disposable    bool           `json:"disposable,omitempty"`
+	Disposable    *bool          `json:"disposable,omitempty"`
 }
 
 type RouteInfo struct {
