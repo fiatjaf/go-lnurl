@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -52,15 +51,15 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 		callback := query.Get("callback")
 		callbackURL, err := url.Parse(callback)
 		if err != nil {
-			return nil, fmt.Errorf("'callback' is not a valid URL: %w", err)
+			break
 		}
 		maxWithdrawable, err := strconv.ParseInt(query.Get("maxWithdrawable"), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("'maxWithdrawable' is not a valid integer: %w", err)
+			break
 		}
 		minWithdrawable, err := strconv.ParseInt(query.Get("minWithdrawable"), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("'minWithdrawable' is not a valid integer: %w", err)
+			break
 		}
 
 		return LNURLWithdrawResponse{
@@ -72,88 +71,88 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 			MinWithdrawable:    minWithdrawable,
 			DefaultDescription: query.Get("defaultDescription"),
 		}, nil
+	}
+
+	resp, err := http.Get(rawurl)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	j := gjson.ParseBytes(b)
+	if j.Get("status").String() == "ERROR" {
+		return nil, errors.New(j.Get("reason").String())
+	}
+
+	switch j.Get("tag").String() {
+	case "withdrawRequest":
+		callback := j.Get("callback").String()
+		callbackURL, err := url.Parse(callback)
+		if err != nil {
+			return nil, errors.New("callback is not a valid URL")
+		}
+
+		return LNURLWithdrawResponse{
+			Tag:                "withdrawRequest",
+			K1:                 j.Get("k1").String(),
+			Callback:           callback,
+			CallbackURL:        callbackURL,
+			MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
+			MinWithdrawable:    j.Get("minWithdrawable").Int(),
+			DefaultDescription: j.Get("defaultDescription").String(),
+		}, nil
+	case "payRequest":
+		strmetadata := j.Get("metadata").String()
+		var metadata [][]string
+		err := json.Unmarshal([]byte(strmetadata), &metadata)
+		if err != nil {
+			return nil, err
+		}
+
+		callback := j.Get("callback").String()
+		callbackURL, err := url.Parse(callback)
+		if err != nil {
+			return nil, errors.New("callback is not a valid URL")
+		}
+
+		parsedMetadata := make(map[string]string)
+		for _, pair := range metadata {
+			parsedMetadata[pair[0]] = pair[1]
+		}
+
+		return LNURLPayResponse1{
+			Tag:             "payRequest",
+			Callback:        callback,
+			CallbackURL:     callbackURL,
+			EncodedMetadata: strmetadata,
+			Metadata:        metadata,
+			ParsedMetadata:  parsedMetadata,
+			MaxSendable:     j.Get("maxSendable").Int(),
+			MinSendable:     j.Get("minSendable").Int(),
+		}, nil
+	case "channelRequest":
+		k1 := j.Get("k1").String()
+		if k1 == "" {
+			return nil, errors.New("k1 is blank")
+		}
+		callback := j.Get("callback").String()
+		callbackURL, err := url.Parse(callback)
+		if err != nil {
+			return nil, errors.New("callback is not a valid URL")
+		}
+
+		return LNURLChannelResponse{
+			Tag:         "channelRequest",
+			K1:          k1,
+			Callback:    callback,
+			CallbackURL: callbackURL,
+			URI:         j.Get("uri").String(),
+		}, nil
 	default:
-		resp, err := http.Get(rawurl)
-		if err != nil {
-			return nil, err
-		}
-
-		b, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		j := gjson.ParseBytes(b)
-		if j.Get("status").String() == "ERROR" {
-			return nil, errors.New(j.Get("reason").String())
-		}
-
-		switch j.Get("tag").String() {
-		case "withdrawRequest":
-			callback := j.Get("callback").String()
-			callbackURL, err := url.Parse(callback)
-			if err != nil {
-				return nil, errors.New("callback is not a valid URL")
-			}
-
-			return LNURLWithdrawResponse{
-				Tag:                "withdrawRequest",
-				K1:                 j.Get("k1").String(),
-				Callback:           callback,
-				CallbackURL:        callbackURL,
-				MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
-				MinWithdrawable:    j.Get("minWithdrawable").Int(),
-				DefaultDescription: j.Get("defaultDescription").String(),
-			}, nil
-		case "payRequest":
-			strmetadata := j.Get("metadata").String()
-			var metadata [][]string
-			err := json.Unmarshal([]byte(strmetadata), &metadata)
-			if err != nil {
-				return nil, err
-			}
-
-			callback := j.Get("callback").String()
-			callbackURL, err := url.Parse(callback)
-			if err != nil {
-				return nil, errors.New("callback is not a valid URL")
-			}
-
-			parsedMetadata := make(map[string]string)
-			for _, pair := range metadata {
-				parsedMetadata[pair[0]] = pair[1]
-			}
-
-			return LNURLPayResponse1{
-				Tag:             "payRequest",
-				Callback:        callback,
-				CallbackURL:     callbackURL,
-				EncodedMetadata: strmetadata,
-				Metadata:        metadata,
-				ParsedMetadata:  parsedMetadata,
-				MaxSendable:     j.Get("maxSendable").Int(),
-				MinSendable:     j.Get("minSendable").Int(),
-			}, nil
-		case "channelRequest":
-			k1 := j.Get("k1").String()
-			if k1 == "" {
-				return nil, errors.New("k1 is blank")
-			}
-			callback := j.Get("callback").String()
-			callbackURL, err := url.Parse(callback)
-			if err != nil {
-				return nil, errors.New("callback is not a valid URL")
-			}
-
-			return LNURLChannelResponse{
-				Tag:         "channelRequest",
-				K1:          k1,
-				Callback:    callback,
-				CallbackURL: callbackURL,
-				URI:         j.Get("uri").String(),
-			}, nil
-		default:
-			return nil, errors.New("unknown response tag " + j.String())
-		}
+		return nil, errors.New("unknown response tag " + j.String())
 	}
 }
