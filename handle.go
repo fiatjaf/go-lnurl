@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/tidwall/gjson"
 )
@@ -17,14 +18,20 @@ import (
 // Returns a different struct for each of the lnurl subprotocols, the .LNURLKind() method of
 // which should be checked next to see how the wallet is going to proceed.
 func HandleLNURL(rawlnurl string) (LNURLParams, error) {
-	lnurl, ok := FindLNURLInText(rawlnurl)
-	if !ok {
-		return nil, errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
-	}
+	var err error
+	var rawurl string
 
-	rawurl, err := LNURLDecode(lnurl)
-	if err != nil {
-		return nil, err
+	if strings.HasPrefix(rawlnurl, "https:") || strings.HasPrefix(rawlnurl, "onion:") {
+		rawurl = rawlnurl
+	} else {
+		lnurl, ok := FindLNURLInText(rawlnurl)
+		if !ok {
+			return nil, errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
+		}
+		rawurl, err = LNURLDecode(lnurl)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	parsed, err := url.Parse(rawurl)
@@ -49,6 +56,9 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 		}, nil
 	case "withdrawRequest":
 		callback := query.Get("callback")
+		if callback == "" {
+			break
+		}
 		callbackURL, err := url.Parse(callback)
 		if err != nil {
 			break

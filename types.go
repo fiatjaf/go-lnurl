@@ -34,6 +34,9 @@ func Action(text string, url string) *SuccessAction {
 		}
 	}
 
+	if text == "" {
+		text = " "
+	}
 	return &SuccessAction{
 		Tag:         "url",
 		Description: text,
