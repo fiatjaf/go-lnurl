@@ -95,7 +95,11 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 	j := gjson.ParseBytes(b)
 	if j.Get("status").String() == "ERROR" {
-		return nil, errors.New(j.Get("reason").String())
+		return nil, LNURLErrorResponse{
+			URL:    parsed,
+			Reason: j.Get("reason").String(),
+			Status: "ERROR",
+		}
 	}
 
 	switch j.Get("tag").String() {
