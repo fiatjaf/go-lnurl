@@ -11,7 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 )
 
-var lnurlregex = regexp.MustCompile(`,*?((lnurl)([0-9]{1,}[a-z0-9]+){1})`)
+var lnurlregex = regexp.MustCompile(`.*?((lnurl)([0-9]{1,}[a-z0-9]+){1})`)
 
 // FindLNURLInText uses a Regular Expression to find a bech32-encoded lnurl string in a blob of text.
 func FindLNURLInText(text string) (lnurl string, ok bool) {
