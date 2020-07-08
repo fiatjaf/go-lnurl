@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tidwall/gjson"
 )
@@ -21,7 +22,7 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 	var err error
 	var rawurl string
 
-	if strings.HasPrefix(rawlnurl, "https:") || strings.HasPrefix(rawlnurl, "onion:") {
+	if strings.HasPrefix(rawlnurl, "https:") {
 		rawurl = rawlnurl
 	} else {
 		lnurl, ok := FindLNURLInText(rawlnurl)
@@ -128,11 +129,19 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 		}
 
 		callback := j.Get("callback").String()
+
+		// parse url
 		callbackURL, err := url.Parse(callback)
 		if err != nil {
 			return nil, errors.New("callback is not a valid URL")
 		}
 
+		// add random nonce to avoid caches
+		qs := callbackURL.Query()
+		qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
+		callbackURL.RawQuery = qs.Encode()
+
+		// turn metadata into a dictionary
 		parsedMetadata := make(map[string]string)
 		for _, pair := range metadata {
 			parsedMetadata[pair[0]] = pair[1]
