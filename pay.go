@@ -2,7 +2,13 @@ package lnurl
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"net/url"
+	"strconv"
+	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 var (
@@ -11,34 +17,6 @@ var (
 	FALSE *bool = &f
 	TRUE  *bool = &t
 )
-
-// The base response for all lnurl calls.
-type LNURLResponse struct {
-	Status string `json:"status,omitempty"`
-	Reason string `json:"reason,omitempty"`
-}
-
-type LNURLErrorResponse struct {
-	Status string   `json:"status,omitempty"`
-	Reason string   `json:"reason,omitempty"`
-	URL    *url.URL `json:"-"`
-}
-
-func (r LNURLErrorResponse) Error() string {
-	return r.Reason
-}
-
-func OkResponse() LNURLResponse {
-	return LNURLResponse{Status: "OK"}
-}
-
-func ErrorResponse(reason string) LNURLErrorResponse {
-	return LNURLErrorResponse{
-		URL:    nil,
-		Status: "ERROR",
-		Reason: reason,
-	}
-}
 
 func Action(text string, url string) *SuccessAction {
 	if url == "" {
@@ -73,34 +51,6 @@ func AESAction(description string, preimage []byte, content string) (*SuccessAct
 		IV:          base64.StdEncoding.EncodeToString(iv),
 	}, nil
 }
-
-type LNURLParams interface {
-	LNURLKind() string
-}
-
-type LNURLChannelResponse struct {
-	LNURLResponse
-	Tag         string   `json:"tag"`
-	K1          string   `json:"k1"`
-	Callback    string   `json:"callback"`
-	CallbackURL *url.URL `json:"-"`
-	URI         string   `json:"uri"`
-}
-
-func (_ LNURLChannelResponse) LNURLKind() string { return "lnurl-channel" }
-
-type LNURLWithdrawResponse struct {
-	LNURLResponse
-	Tag                string   `json:"tag"`
-	K1                 string   `json:"k1"`
-	Callback           string   `json:"callback"`
-	CallbackURL        *url.URL `json:"-"`
-	MaxWithdrawable    int64    `json:"maxWithdrawable"`
-	MinWithdrawable    int64    `json:"minWithdrawable"`
-	DefaultDescription string   `json:"defaultDescription"`
-}
-
-func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
 
 type LNURLPayResponse1 struct {
 	LNURLResponse
@@ -157,11 +107,41 @@ func (sa *SuccessAction) Decipher(preimage []byte) (content string, err error) {
 
 func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
 
-type LNURLAuthParams struct {
-	Tag      string
-	K1       string
-	Callback string
-	Host     string
-}
+func HandlePay(j gjson.Result) (LNURLParams, error) {
+	strmetadata := j.Get("metadata").String()
+	var metadata [][]string
+	err := json.Unmarshal([]byte(strmetadata), &metadata)
+	if err != nil {
+		return nil, err
+	}
 
-func (_ LNURLAuthParams) LNURLKind() string { return "lnurl-auth" }
+	callback := j.Get("callback").String()
+
+	// parse url
+	callbackURL, err := url.Parse(callback)
+	if err != nil {
+		return nil, errors.New("callback is not a valid URL")
+	}
+
+	// add random nonce to avoid caches
+	qs := callbackURL.Query()
+	qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
+	callbackURL.RawQuery = qs.Encode()
+
+	// turn metadata into a dictionary
+	parsedMetadata := make(map[string]string)
+	for _, pair := range metadata {
+		parsedMetadata[pair[0]] = pair[1]
+	}
+
+	return LNURLPayResponse1{
+		Tag:             "payRequest",
+		Callback:        callback,
+		CallbackURL:     callbackURL,
+		EncodedMetadata: strmetadata,
+		Metadata:        metadata,
+		ParsedMetadata:  parsedMetadata,
+		MaxSendable:     j.Get("maxSendable").Int(),
+		MinSendable:     j.Get("minSendable").Int(),
+	}, nil
+}
