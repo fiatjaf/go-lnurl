@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -54,14 +55,13 @@ func AESAction(description string, preimage []byte, content string) (*SuccessAct
 
 type LNURLPayResponse1 struct {
 	LNURLResponse
-	Callback        string            `json:"callback"`
-	CallbackURL     *url.URL          `json:"-"`
-	Tag             string            `json:"tag"`
-	MaxSendable     int64             `json:"maxSendable"`
-	MinSendable     int64             `json:"minSendable"`
-	EncodedMetadata string            `json:"metadata"`
-	Metadata        [][]string        `json:"-"`
-	ParsedMetadata  map[string]string `json:"-"`
+	Callback        string   `json:"callback"`
+	CallbackURL     *url.URL `json:"-"`
+	Tag             string   `json:"tag"`
+	MaxSendable     int64    `json:"maxSendable"`
+	MinSendable     int64    `json:"minSendable"`
+	EncodedMetadata string   `json:"metadata"`
+	Metadata        Metadata `json:"-"`
 }
 
 type LNURLPayResponse2 struct {
@@ -109,7 +109,7 @@ func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
 
 func HandlePay(j gjson.Result) (LNURLParams, error) {
 	strmetadata := j.Get("metadata").String()
-	var metadata [][]string
+	var metadata Metadata
 	err := json.Unmarshal([]byte(strmetadata), &metadata)
 	if err != nil {
 		return nil, err
@@ -128,20 +128,73 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
 	callbackURL.RawQuery = qs.Encode()
 
-	// turn metadata into a dictionary
-	parsedMetadata := make(map[string]string)
-	for _, pair := range metadata {
-		parsedMetadata[pair[0]] = pair[1]
-	}
-
 	return LNURLPayResponse1{
 		Tag:             "payRequest",
 		Callback:        callback,
 		CallbackURL:     callbackURL,
 		EncodedMetadata: strmetadata,
 		Metadata:        metadata,
-		ParsedMetadata:  parsedMetadata,
 		MaxSendable:     j.Get("maxSendable").Int(),
 		MinSendable:     j.Get("minSendable").Int(),
 	}, nil
+}
+
+type Metadata [][]string
+
+// Description returns the content of text/plain metadata entry.
+func (m Metadata) Description() string {
+	for _, entry := range m {
+		if len(entry) == 2 && entry[0] == "text/plain" {
+			return entry[1]
+		}
+	}
+	return ""
+}
+
+// ImageDataURI returns image in the form data:image/type;base64,... if an image exists
+// or an empty string if not.
+func (m Metadata) ImageDataURI() string {
+	for _, entry := range m {
+		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
+			return "data:" + entry[0] + "," + entry[1]
+		}
+	}
+	return ""
+}
+
+// ImageBytes returns image as bytes, decoded from base64 if an image exists
+// or nil if not.
+func (m Metadata) ImageBytes() []byte {
+	for _, entry := range m {
+		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
+			if decoded, err := base64.StdEncoding.DecodeString(entry[1]); err == nil {
+				return decoded
+			}
+		}
+	}
+	return nil
+}
+
+// ImageExtension returns the file extension for the image, either "png" or "jpeg"
+func (m Metadata) ImageExtension() string {
+	for _, entry := range m {
+		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
+			spl := strings.Split(entry[0], "/")
+			if len(spl) == 2 {
+				return strings.Split(spl[1], ";")[0]
+			}
+		}
+	}
+	return ""
+}
+
+// Entry returns an arbitrary entry from the metadata array.
+// eg.: "video/mp4" or "application/vnd.some-specific-thing-from-a-specific-app".
+func (m Metadata) Entry(key string) string {
+	for _, entry := range m {
+		if len(entry) == 2 && entry[0] == key {
+			return entry[1]
+		}
+	}
+	return ""
 }
