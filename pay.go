@@ -62,6 +62,7 @@ type LNURLPayResponse1 struct {
 	MinSendable     int64    `json:"minSendable"`
 	EncodedMetadata string   `json:"metadata"`
 	Metadata        Metadata `json:"-"`
+	CommentAllowed  int64    `json:"commentAllowed"`
 }
 
 type LNURLPayResponse2 struct {
@@ -136,6 +137,7 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 		Metadata:        metadata,
 		MaxSendable:     j.Get("maxSendable").Int(),
 		MinSendable:     j.Get("minSendable").Int(),
+		CommentAllowed:  j.Get("commentAllowed").Int(),
 	}, nil
 }
 
