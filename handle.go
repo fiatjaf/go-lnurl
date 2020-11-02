@@ -14,7 +14,7 @@ import (
 // string or calls the URL to get the parameters.
 // Returns a different struct for each of the lnurl subprotocols, the .LNURLKind() method of
 // which should be checked next to see how the wallet is going to proceed.
-func HandleLNURL(rawlnurl string) (LNURLParams, error) {
+func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 	var err error
 	var rawurl string
 
@@ -23,43 +23,44 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 	} else {
 		lnurl, ok := FindLNURLInText(rawlnurl)
 		if !ok {
-			return nil, errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
+			return "", nil, errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
 		}
 		rawurl, err = LNURLDecode(lnurl)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 
 	parsed, err := url.Parse(rawurl)
 	if err != nil {
-		return nil, err
+		return rawurl, nil, err
 	}
 
 	query := parsed.Query()
 
 	switch query.Get("tag") {
 	case "login":
-		return HandleAuth(rawurl, parsed, query)
+		value, err := HandleAuth(rawurl, parsed, query)
+		return rawurl, value, err
 	case "withdrawRequest":
 		if value, ok := HandleFastWithdraw(query); ok {
-			return value, nil
+			return rawurl, value, nil
 		}
 	}
 
 	resp, err := http.Get(rawurl)
 	if err != nil {
-		return nil, err
+		return rawurl, nil, err
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return rawurl, nil, err
 	}
 
 	j := gjson.ParseBytes(b)
 	if j.Get("status").String() == "ERROR" {
-		return nil, LNURLErrorResponse{
+		return rawurl, nil, LNURLErrorResponse{
 			URL:    parsed,
 			Reason: j.Get("reason").String(),
 			Status: "ERROR",
@@ -68,12 +69,15 @@ func HandleLNURL(rawlnurl string) (LNURLParams, error) {
 
 	switch j.Get("tag").String() {
 	case "withdrawRequest":
-		return HandleWithdraw(j)
+		value, err := HandleWithdraw(j)
+		return rawurl, value, err
 	case "payRequest":
-		return HandlePay(j)
+		value, err := HandlePay(j)
+		return rawurl, value, err
 	case "channelRequest":
-		return HandleChannel(j)
+		value, err := HandleChannel(j)
+		return rawurl, value, err
 	default:
-		return nil, errors.New("unknown response tag " + j.String())
+		return rawurl, nil, errors.New("unknown response tag " + j.String())
 	}
 }
