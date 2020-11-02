@@ -2,7 +2,7 @@ package lnurl
 
 import (
 	"crypto/rand"
-	"math/big"
+	"encoding/hex"
 	"regexp"
 	"strings"
 )
@@ -23,14 +23,7 @@ func FindLNURLInText(text string) (lnurl string, ok bool) {
 
 // RandomK1 returns a 32-byte random hex-encoded string for usage as k1 in lnurl-auth and anywhere else.
 func RandomK1() string {
-	hex := []rune("0123456789abcdef")
-	b := make([]rune, 64)
-	for i := range b {
-		r, err := rand.Int(rand.Reader, big.NewInt(16))
-		if err != nil {
-			return ""
-		}
-		b[i] = hex[r.Int64()]
-	}
-	return string(b)
+	random := make([]byte, 32)
+	rand.Read(random)
+	return hex.EncodeToString(random)
 }
