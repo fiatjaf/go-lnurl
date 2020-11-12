@@ -32,7 +32,7 @@ func VerifySignature(k1, sig, key string) (ok bool, err error) {
 		return false, errors.New("Failed to parse pubkey: " + err.Error())
 	}
 
-	signature, err := btcec.ParseSignature(bsig, btcec.S256())
+	signature, err := btcec.ParseDERSignature(bsig, btcec.S256())
 	if err != nil {
 		return false, errors.New("Failed to parse signature: " + err.Error())
 	}
