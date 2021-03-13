@@ -71,6 +71,12 @@ type LNURLPayResponse2 struct {
 	Routes        [][]RouteInfo  `json:"routes"`
 	PR            string         `json:"pr"`
 	Disposable    *bool          `json:"disposable,omitempty"`
+	Schedule      *ScheduleInfo  `json:"schedule,omitempty"`
+}
+
+type ScheduleInfo struct {
+	Period string `json:"period"` // day, week, month, year
+	Limit  int64  `json:"limit"`  // number of times this should repeat, -1 = forever
 }
 
 type RouteInfo struct {

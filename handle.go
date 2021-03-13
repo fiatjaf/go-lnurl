@@ -77,6 +77,9 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 	case "channelRequest":
 		value, err := HandleChannel(j)
 		return rawurl, value, err
+	case "allowanceRequest":
+		value, err := HandleAllowance(j)
+		return rawurl, value, err
 	default:
 		return rawurl, nil, errors.New("unknown response tag " + j.String())
 	}
