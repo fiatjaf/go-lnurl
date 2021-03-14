@@ -17,6 +17,7 @@ type LNURLWithdrawResponse struct {
 	MaxWithdrawable    int64    `json:"maxWithdrawable"`
 	MinWithdrawable    int64    `json:"minWithdrawable"`
 	DefaultDescription string   `json:"defaultDescription"`
+	BalanceCheck       string   `json:"balanceCheck,omitempty"`
 }
 
 func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
@@ -36,6 +37,7 @@ func HandleWithdraw(j gjson.Result) (LNURLParams, error) {
 		MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
 		MinWithdrawable:    j.Get("minWithdrawable").Int(),
 		DefaultDescription: j.Get("defaultDescription").String(),
+		BalanceCheck:       j.Get("balanceCheck").String(),
 	}, nil
 }
 
@@ -56,6 +58,7 @@ func HandleFastWithdraw(query url.Values) (LNURLParams, bool) {
 	if err != nil {
 		return nil, false
 	}
+	balanceCheck := query.Get("balanceCheck")
 
 	return LNURLWithdrawResponse{
 		Tag:                "withdrawRequest",
@@ -65,5 +68,6 @@ func HandleFastWithdraw(query url.Values) (LNURLParams, bool) {
 		MaxWithdrawable:    maxWithdrawable,
 		MinWithdrawable:    minWithdrawable,
 		DefaultDescription: query.Get("defaultDescription"),
+		BalanceCheck:       balanceCheck,
 	}, true
 }
