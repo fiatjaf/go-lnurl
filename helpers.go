@@ -27,3 +27,24 @@ func RandomK1() string {
 	rand.Read(random)
 	return hex.EncodeToString(random)
 }
+
+// ParseInternetIdentifier extracts name and domain from an email-like string like username@example.com
+func ParseInternetIdentifier(text string) (name, domain string, ok bool) {
+	nameAndDomain := strings.Split(text, "@")
+	if len(nameAndDomain) != 2 {
+		return
+	}
+
+	name = nameAndDomain[0]
+	domain = nameAndDomain[1]
+	if len(name) == 0 || len(domain) == 0 {
+		return
+	}
+
+	if strings.Index(domain, ".") == -1 {
+		return
+	}
+
+	ok = true
+	return
+}

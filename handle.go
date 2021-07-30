@@ -18,12 +18,21 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 	var err error
 	var rawurl string
 
-	if strings.HasPrefix(rawlnurl, "https:") {
+	if name, domain, ok := ParseInternetIdentifier(rawlnurl); ok {
+		isOnion := strings.Index(domain, ".onion") == len(domain)-6
+		rawurl = domain + "/.well-known/lnurlp/" + name
+		if isOnion {
+			rawurl = "http://" + rawurl
+		} else {
+			rawurl = "https://" + rawurl
+		}
+	} else if strings.HasPrefix(rawlnurl, "http") {
 		rawurl = rawlnurl
 	} else {
 		lnurl, ok := FindLNURLInText(rawlnurl)
 		if !ok {
-			return "", nil, errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
+			return "", nil,
+				errors.New("invalid bech32-encoded lnurl: " + rawlnurl)
 		}
 		rawurl, err = LNURLDecode(lnurl)
 		if err != nil {
