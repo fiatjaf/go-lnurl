@@ -190,6 +190,17 @@ func (m Metadata) ImageExtension() string {
 	return ""
 }
 
+// LightningAddress returns either text/identifier or text/email
+func (m Metadata) LightningAddress() string {
+	if identifier := m.Entry("text/identifier"); identifier != "" {
+		return identifier
+	}
+	if email := m.Entry("text/email"); email != "" {
+		return email
+	}
+	return ""
+}
+
 // Entry returns an arbitrary entry from the metadata array.
 // eg.: "video/mp4" or "application/vnd.some-specific-thing-from-a-specific-app".
 func (m Metadata) Entry(key string) string {
