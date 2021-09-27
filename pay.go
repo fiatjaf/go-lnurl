@@ -2,11 +2,11 @@ package lnurl
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -141,25 +141,26 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	}, nil
 }
 
-type Metadata [][]string
+type Metadata [][]interface{}
 
 // Description returns the content of text/plain metadata entry.
 func (m Metadata) Description() string {
-	for _, entry := range m {
-		if len(entry) == 2 && entry[0] == "text/plain" {
-			return entry[1]
-		}
-	}
-	return ""
+	return m.Entry("text/plain")
+}
+
+// LongDescription returns the content of text/long-desc metadata entry.
+func (m Metadata) LongDescription() string {
+	return m.Entry("text/long-desc")
 }
 
 // ImageDataURI returns image in the form data:image/type;base64,... if an image exists
 // or an empty string if not.
 func (m Metadata) ImageDataURI() string {
-	for _, entry := range m {
-		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
-			return "data:" + entry[0] + "," + entry[1]
-		}
+	if v := m.Entry("image/png;base64"); v != "" {
+		return "data:image/png;base64," + v
+	}
+	if v := m.Entry("image/jpeg;base64"); v != "" {
+		return "data:image/jpeg;base64," + v
 	}
 	return ""
 }
@@ -167,11 +168,14 @@ func (m Metadata) ImageDataURI() string {
 // ImageBytes returns image as bytes, decoded from base64 if an image exists
 // or nil if not.
 func (m Metadata) ImageBytes() []byte {
-	for _, entry := range m {
-		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
-			if decoded, err := base64.StdEncoding.DecodeString(entry[1]); err == nil {
-				return decoded
-			}
+	if v := m.Entry("image/png;base64"); v != "" {
+		if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
+			return decoded
+		}
+	}
+	if v := m.Entry("image/jpeg;base64"); v != "" {
+		if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
+			return decoded
 		}
 	}
 	return nil
@@ -179,13 +183,11 @@ func (m Metadata) ImageBytes() []byte {
 
 // ImageExtension returns the file extension for the image, either "png" or "jpeg"
 func (m Metadata) ImageExtension() string {
-	for _, entry := range m {
-		if len(entry) == 2 && strings.Split(entry[0], "/")[0] == "image" {
-			spl := strings.Split(entry[0], "/")
-			if len(spl) == 2 {
-				return strings.Split(spl[1], ";")[0]
-			}
-		}
+	if v := m.Entry("image/png;base64"); v != "" {
+		return "png"
+	}
+	if v := m.Entry("image/jpeg;base64"); v != "" {
+		return "jpeg"
 	}
 	return ""
 }
@@ -201,12 +203,63 @@ func (m Metadata) LightningAddress() string {
 	return ""
 }
 
+// PayerIDs
+type PayerIDs struct {
+	FreeName         bool
+	PubKey           bool
+	LightningAddress bool
+	Email            bool
+	KeyAuth          struct {
+		Allowed   bool
+		Mandatory bool
+		K1        []byte
+	}
+}
+
+func (m Metadata) AllowedPayerIDs() PayerIDs {
+	payerIDs := PayerIDs{}
+
+	for _, entry := range m {
+		if len(entry) > 1 && entry[0] == "application/payer-ids" {
+			for _, ialt := range entry[1:] {
+				if alt, ok := ialt.([]interface{}); ok {
+					if len(alt) > 0 {
+						if tag, ok := alt[0].(string); ok {
+							switch tag {
+							case "text/plain":
+								payerIDs.FreeName = true
+							case "application/pubkey":
+								payerIDs.PubKey = true
+							case "application/lnurl-auth":
+								if len(alt) == 3 {
+									payerIDs.KeyAuth.Allowed = true
+									payerIDs.KeyAuth.Mandatory, _ = alt[1].(bool)
+									k1, _ := alt[2].(string)
+									payerIDs.KeyAuth.K1, _ = hex.DecodeString(k1)
+								}
+							case "text/identifier":
+								payerIDs.LightningAddress = true
+							case "text/email":
+								payerIDs.Email = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return payerIDs
+}
+
 // Entry returns an arbitrary entry from the metadata array.
 // eg.: "video/mp4" or "application/vnd.some-specific-thing-from-a-specific-app".
 func (m Metadata) Entry(key string) string {
 	for _, entry := range m {
 		if len(entry) == 2 && entry[0] == key {
-			return entry[1]
+			if v, ok := entry[1].(string); ok {
+				return v
+			}
 		}
 	}
 	return ""

@@ -9,10 +9,11 @@ import (
 )
 
 type LNURLAuthParams struct {
-	Tag      string
-	K1       string
-	Callback string
-	Host     string
+	Tag         string   `json:"tag"`
+	K1          string   `json:"k1"`
+	Callback    string   `json:"callback"`
+	CallbackURL *url.URL `json:"-"`
+	Host        string   `json:"host"`
 }
 
 func (_ LNURLAuthParams) LNURLKind() string { return "lnurl-auth" }
@@ -47,9 +48,10 @@ func HandleAuth(rawurl string, parsed *url.URL, query url.Values) (LNURLParams, 
 	}
 
 	return LNURLAuthParams{
-		Tag:      "login",
-		K1:       k1,
-		Callback: rawurl,
-		Host:     parsed.Host,
+		Tag:         "login",
+		K1:          k1,
+		Callback:    rawurl,
+		CallbackURL: parsed,
+		Host:        parsed.Host,
 	}, nil
 }
