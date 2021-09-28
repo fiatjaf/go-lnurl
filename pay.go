@@ -1,12 +1,13 @@
 package lnurl
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -55,14 +56,13 @@ func AESAction(description string, preimage []byte, content string) (*SuccessAct
 
 type LNURLPayResponse1 struct {
 	LNURLResponse
-	Callback        string   `json:"callback"`
-	CallbackURL     *url.URL `json:"-"`
-	Tag             string   `json:"tag"`
-	MaxSendable     int64    `json:"maxSendable"`
-	MinSendable     int64    `json:"minSendable"`
-	EncodedMetadata string   `json:"metadata"`
-	Metadata        Metadata `json:"-"`
-	CommentAllowed  int64    `json:"commentAllowed"`
+	Callback       string   `json:"callback"`
+	CallbackURL    *url.URL `json:"-"`
+	Tag            string   `json:"tag"`
+	MaxSendable    int64    `json:"maxSendable"`
+	MinSendable    int64    `json:"minSendable"`
+	Metadata       Metadata `json:"metadata"`
+	CommentAllowed int64    `json:"commentAllowed"`
 }
 
 type LNURLPayResponse2 struct {
@@ -130,117 +130,93 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	callbackURL.RawQuery = qs.Encode()
 
 	return LNURLPayResponse1{
-		Tag:             "payRequest",
-		Callback:        callback,
-		CallbackURL:     callbackURL,
-		EncodedMetadata: strmetadata,
-		Metadata:        metadata,
-		MaxSendable:     j.Get("maxSendable").Int(),
-		MinSendable:     j.Get("minSendable").Int(),
-		CommentAllowed:  j.Get("commentAllowed").Int(),
+		Tag:            "payRequest",
+		Callback:       callback,
+		CallbackURL:    callbackURL,
+		Metadata:       metadata,
+		MaxSendable:    j.Get("maxSendable").Int(),
+		MinSendable:    j.Get("minSendable").Int(),
+		CommentAllowed: j.Get("commentAllowed").Int(),
 	}, nil
 }
 
-type Metadata [][]interface{}
+type Metadata struct {
+	Encoded string
 
-// Description returns the content of text/plain metadata entry.
-func (m Metadata) Description() string {
-	return m.Entry("text/plain")
-}
-
-// LongDescription returns the content of text/long-desc metadata entry.
-func (m Metadata) LongDescription() string {
-	return m.Entry("text/long-desc")
-}
-
-// ImageDataURI returns image in the form data:image/type;base64,... if an image exists
-// or an empty string if not.
-func (m Metadata) ImageDataURI() string {
-	if v := m.Entry("image/png;base64"); v != "" {
-		return "data:image/png;base64," + v
+	Description     string
+	LongDescription string
+	Image           struct {
+		DataURI string
+		Bytes   []byte
+		Ext     string
 	}
-	if v := m.Entry("image/jpeg;base64"); v != "" {
-		return "data:image/jpeg;base64," + v
-	}
-	return ""
-}
+	LightningAddress string
+	IsEmail          bool
 
-// ImageBytes returns image as bytes, decoded from base64 if an image exists
-// or nil if not.
-func (m Metadata) ImageBytes() []byte {
-	if v := m.Entry("image/png;base64"); v != "" {
-		if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
-			return decoded
+	PayerIDs struct {
+		FreeName         bool
+		PubKey           bool
+		LightningAddress bool
+		Email            bool
+		KeyAuth          struct {
+			Allowed   bool
+			Mandatory bool
+			K1        string
 		}
 	}
-	if v := m.Entry("image/jpeg;base64"); v != "" {
-		if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
-			return decoded
+}
+
+func (m *Metadata) UnmarshalJSON(src []byte) error {
+	m.Encoded = string(src)
+
+	var array []interface{}
+	if err := json.Unmarshal(src, &array); err != nil {
+		return err
+	}
+
+	for _, item := range array {
+		entry, _ := item.([]interface{})
+		if len(entry) <= 1 {
+			continue
 		}
-	}
-	return nil
-}
 
-// ImageExtension returns the file extension for the image, either "png" or "jpeg"
-func (m Metadata) ImageExtension() string {
-	if v := m.Entry("image/png;base64"); v != "" {
-		return "png"
-	}
-	if v := m.Entry("image/jpeg;base64"); v != "" {
-		return "jpeg"
-	}
-	return ""
-}
+		switch entry[0] {
+		case "text/plain":
+			m.Description, _ = entry[1].(string)
+		case "text/long-desc":
+			m.LongDescription, _ = entry[1].(string)
+		case "image/png;base64", "image/jpeg;base64":
+			k, _ := entry[0].(string)
+			v, _ := entry[1].(string)
 
-// LightningAddress returns either text/identifier or text/email
-func (m Metadata) LightningAddress() string {
-	if identifier := m.Entry("text/identifier"); identifier != "" {
-		return identifier
-	}
-	if email := m.Entry("text/email"); email != "" {
-		return email
-	}
-	return ""
-}
-
-// PayerIDs
-type PayerIDs struct {
-	FreeName         bool
-	PubKey           bool
-	LightningAddress bool
-	Email            bool
-	KeyAuth          struct {
-		Allowed   bool
-		Mandatory bool
-		K1        []byte
-	}
-}
-
-func (m Metadata) AllowedPayerIDs() PayerIDs {
-	payerIDs := PayerIDs{}
-
-	for _, entry := range m {
-		if len(entry) > 1 && entry[0] == "application/payer-ids" {
+			m.Image.DataURI = "data:" + k + "," + v
+			m.Image.Bytes, _ = base64.StdEncoding.DecodeString(v)
+			m.Image.Ext = strings.Split(strings.Split(k, "/")[1], ";")[0]
+		case "text/email", "text/identifier":
+			m.LightningAddress, _ = entry[1].(string)
+			if entry[0].(string) == "text/email" {
+				m.IsEmail = true
+			}
+		case "application/payer-ids":
 			for _, ialt := range entry[1:] {
 				if alt, ok := ialt.([]interface{}); ok {
 					if len(alt) > 0 {
 						if tag, ok := alt[0].(string); ok {
 							switch tag {
 							case "text/plain":
-								payerIDs.FreeName = true
+								m.PayerIDs.FreeName = true
 							case "application/pubkey":
-								payerIDs.PubKey = true
+								m.PayerIDs.PubKey = true
 							case "application/lnurl-auth":
 								if len(alt) == 3 {
-									payerIDs.KeyAuth.Allowed = true
-									payerIDs.KeyAuth.Mandatory, _ = alt[1].(bool)
-									k1, _ := alt[2].(string)
-									payerIDs.KeyAuth.K1, _ = hex.DecodeString(k1)
+									m.PayerIDs.KeyAuth.Allowed = true
+									m.PayerIDs.KeyAuth.Mandatory, _ = alt[1].(bool)
+									m.PayerIDs.KeyAuth.K1, _ = alt[2].(string)
 								}
 							case "text/identifier":
-								payerIDs.LightningAddress = true
+								m.PayerIDs.LightningAddress = true
 							case "text/email":
-								payerIDs.Email = true
+								m.PayerIDs.Email = true
 							}
 						}
 					}
@@ -249,18 +225,73 @@ func (m Metadata) AllowedPayerIDs() PayerIDs {
 		}
 	}
 
-	return payerIDs
+	return nil
 }
 
-// Entry returns an arbitrary entry from the metadata array.
-// eg.: "video/mp4" or "application/vnd.some-specific-thing-from-a-specific-app".
-func (m Metadata) Entry(key string) string {
-	for _, entry := range m {
-		if len(entry) == 2 && entry[0] == key {
-			if v, ok := entry[1].(string); ok {
-				return v
-			}
-		}
+func (m Metadata) MarshalJSON() ([]byte, error) {
+	if m.Encoded != "" {
+		return json.Marshal(m.Encoded)
 	}
-	return ""
+
+	raw := make([]interface{}, 0, 5)
+	raw = append(raw, []string{"text/plain", m.Description})
+
+	if m.LongDescription != "" {
+		raw = append(raw, []string{"text/long-desc", m.LongDescription})
+	}
+
+	if m.Image.Bytes != nil {
+		raw = append(raw, []string{"image/" + m.Image.Ext + ";base64",
+			base64.StdEncoding.EncodeToString(m.Image.Bytes)})
+	} else if m.Image.DataURI != "" {
+		raw = append(raw, strings.SplitN(m.Image.DataURI[5:], ",", 2))
+	}
+
+	if m.LightningAddress != "" {
+		tag := "text/identifier"
+		if m.IsEmail {
+			tag = "text/email"
+		}
+		raw = append(raw, []string{tag, m.LightningAddress})
+	}
+
+	payerIDs := []interface{}{"application/payer-ids"}
+	if m.PayerIDs.FreeName {
+		payerIDs = append(payerIDs, []string{"text/plain"})
+	}
+	if m.PayerIDs.PubKey {
+		payerIDs = append(payerIDs, []string{"application/pubkey"})
+	}
+	if m.PayerIDs.LightningAddress {
+		payerIDs = append(payerIDs, []string{"text/identifier"})
+	}
+	if m.PayerIDs.Email {
+		payerIDs = append(payerIDs, []string{"text/email"})
+	}
+	if m.PayerIDs.KeyAuth.Allowed {
+		payerIDs = append(payerIDs, []interface{}{
+			"application/lnurl-auth",
+			m.PayerIDs.KeyAuth.Mandatory,
+			m.PayerIDs.KeyAuth.K1,
+		})
+	}
+	if len(payerIDs) > 1 {
+		raw = append(raw, payerIDs)
+	}
+
+	j, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(string(j))
+}
+
+func (m Metadata) Hash() [32]byte {
+	j, _ := json.Marshal(m)
+
+	var raw string
+	json.Unmarshal(j, &raw)
+
+	return sha256.Sum256([]byte(raw))
 }
