@@ -3,13 +3,16 @@ package lnurl
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	decodepay "github.com/fiatjaf/ln-decodepay"
 	"github.com/tidwall/gjson"
 )
 
@@ -54,28 +57,66 @@ func AESAction(description string, preimage []byte, content string) (*SuccessAct
 	}, nil
 }
 
-type LNURLPayResponse1 struct {
+type LNURLPayParams struct {
 	LNURLResponse
-	Callback       string   `json:"callback"`
-	CallbackURL    *url.URL `json:"-"`
-	Tag            string   `json:"tag"`
-	MaxSendable    int64    `json:"maxSendable"`
-	MinSendable    int64    `json:"minSendable"`
-	Metadata       Metadata `json:"metadata"`
-	CommentAllowed int64    `json:"commentAllowed"`
+	Callback       string        `json:"callback"`
+	Tag            string        `json:"tag"`
+	MaxSendable    int64         `json:"maxSendable"`
+	MinSendable    int64         `json:"minSendable"`
+	Metadata       Metadata      `json:"metadata"`
+	CommentAllowed int64         `json:"commentAllowed"`
+	PayerData      PayerDataSpec `json:"payerData,omitempty"`
 }
 
-type LNURLPayResponse2 struct {
+func (params LNURLPayParams) CallbackURL() *url.URL {
+	parsed, _ := url.Parse(params.Callback)
+	return parsed
+}
+
+type PayerDataSpec struct {
+	FreeName         *PayerDataItemSpec    `json:"name"`
+	PubKey           *PayerDataItemSpec    `json:"pubkey"`
+	LightningAddress *PayerDataItemSpec    `json:"identifier"`
+	Email            *PayerDataItemSpec    `json:"email"`
+	KeyAuth          *PayerDataKeyAuthSpec `json:"auth"`
+}
+
+func (s PayerDataSpec) Exists() bool {
+	return s.FreeName != nil || s.PubKey != nil || s.LightningAddress != nil || s.Email != nil || s.KeyAuth != nil
+}
+
+type PayerDataItemSpec struct {
+	Mandatory bool `json:"mandatory"`
+}
+
+type PayerDataKeyAuthSpec struct {
+	*PayerDataItemSpec
+	K1 string `json:"k1"`
+}
+
+type LNURLPayValues struct {
 	LNURLResponse
 	SuccessAction *SuccessAction `json:"successAction"`
-	Routes        [][]RouteInfo  `json:"routes"`
+	Routes        []struct{}     `json:"routes"` // always empty
 	PR            string         `json:"pr"`
 	Disposable    *bool          `json:"disposable,omitempty"`
+
+	ParsedInvoice decodepay.Bolt11 `json:"-"`
+	PayerDataJSON string           `json:"-"`
 }
 
-type RouteInfo struct {
-	NodeId        string `json:"nodeId"`
-	ChannelUpdate string `json:"channelUpdate"`
+type PayerDataValues struct {
+	FreeName         string                  `json:"name,omitempty"`
+	PubKey           string                  `json:"pubkey,omitempty"`
+	LightningAddress string                  `json:"identifier,omitempty"`
+	Email            string                  `json:"email,omitempty"`
+	KeyAuth          *PayerDataKeyAuthValues `json:"auth,omitempty"`
+}
+
+type PayerDataKeyAuthValues struct {
+	K1  string `json:"k1"`
+	Sig string `json:"sig"`
+	Key string `json:"key"`
 }
 
 type SuccessAction struct {
@@ -106,7 +147,7 @@ func (sa *SuccessAction) Decipher(preimage []byte) (content string, err error) {
 	return string(plaintext), nil
 }
 
-func (_ LNURLPayResponse1) LNURLKind() string { return "lnurl-pay" }
+func (_ LNURLPayParams) LNURLKind() string { return "lnurl-pay" }
 
 func HandlePay(j gjson.Result) (LNURLParams, error) {
 	strmetadata := j.Get("metadata").String()
@@ -129,19 +170,99 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
 	callbackURL.RawQuery = qs.Encode()
 
-	return LNURLPayResponse1{
+	// unmarshal payerdata
+	var payerData PayerDataSpec
+	json.Unmarshal([]byte(j.Get("payerData").String()), &payerData)
+
+	return LNURLPayParams{
 		Tag:            "payRequest",
-		Callback:       callback,
-		CallbackURL:    callbackURL,
+		Callback:       callbackURL.String(),
 		Metadata:       metadata,
 		MaxSendable:    j.Get("maxSendable").Int(),
 		MinSendable:    j.Get("minSendable").Int(),
 		CommentAllowed: j.Get("commentAllowed").Int(),
+		PayerData:      payerData,
 	}, nil
 }
 
+func (params LNURLPayParams) Call(
+	msats int64,
+	comment string,
+	payerdata *PayerDataValues,
+) (*LNURLPayValues, error) {
+	callback := params.CallbackURL()
+
+	qs := callback.Query()
+	qs.Set("amount", strconv.FormatInt(msats, 10))
+
+	if comment != "" {
+		qs.Set("comment", comment)
+	}
+
+	var payerdataJSON string
+	if params.PayerData.Exists() && payerdata != nil {
+		j, _ := json.Marshal(payerdata)
+		payerdataJSON = string(j)
+		qs.Set("payerdata", payerdataJSON)
+	}
+
+	callback.RawQuery = qs.Encode()
+
+	resp, err := Client.Get(callback.String())
+	if err != nil {
+		return nil, fmt.Errorf("http error calling '%s': %w",
+			callback.String(), err)
+	}
+	defer resp.Body.Close()
+
+	var values LNURLPayValues
+	if err := json.NewDecoder(resp.Body).Decode(&values); err != nil {
+		return nil, fmt.Errorf("got invalid JSON from '%s': %w",
+			callback.String(), err)
+	}
+
+	if values.Status == "ERROR" {
+		return nil, LNURLErrorResponse{
+			Status: values.Status,
+			Reason: values.Reason,
+			URL:    callback,
+		}
+	}
+
+	inv, err := decodepay.Decodepay(values.PR)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing invoice '%s': %w", values.PR, err)
+	}
+
+	values.ParsedInvoice = inv
+	values.PayerDataJSON = payerdataJSON
+
+	var hhash [32]byte
+	if payerdata != nil && params.PayerData.Exists() {
+		hhash = params.Metadata.HashWithPayerData(payerdataJSON)
+	} else {
+		hhash = params.Metadata.Hash()
+	}
+
+	if inv.DescriptionHash != hex.EncodeToString(hhash[:]) {
+		return nil, fmt.Errorf("wrong description_hash (expected %s, got %s)",
+			hex.EncodeToString(hhash[:]),
+			inv.DescriptionHash,
+		)
+	}
+
+	if int64(inv.MSatoshi) != msats {
+		return nil, fmt.Errorf("got invoice with wrong amount (wanted %d, got %d)",
+			msats,
+			inv.MSatoshi,
+		)
+	}
+
+	return &values, nil
+}
+
 type Metadata struct {
-	Encoded string
+	Encoded []byte
 
 	Description     string
 	LongDescription string
@@ -152,22 +273,10 @@ type Metadata struct {
 	}
 	LightningAddress string
 	IsEmail          bool
-
-	PayerIDs struct {
-		FreeName         bool
-		PubKey           bool
-		LightningAddress bool
-		Email            bool
-		KeyAuth          struct {
-			Allowed   bool
-			Mandatory bool
-			K1        string
-		}
-	}
 }
 
 func (m *Metadata) UnmarshalJSON(src []byte) error {
-	m.Encoded = string(src)
+	m.Encoded = src
 
 	var array []interface{}
 	if err := json.Unmarshal(src, &array); err != nil {
@@ -197,31 +306,6 @@ func (m *Metadata) UnmarshalJSON(src []byte) error {
 			if entry[0].(string) == "text/email" {
 				m.IsEmail = true
 			}
-		case "application/payer-ids":
-			for _, ialt := range entry[1:] {
-				if alt, ok := ialt.([]interface{}); ok {
-					if len(alt) > 0 {
-						if tag, ok := alt[0].(string); ok {
-							switch tag {
-							case "text/plain":
-								m.PayerIDs.FreeName = true
-							case "application/pubkey":
-								m.PayerIDs.PubKey = true
-							case "application/lnurl-auth":
-								if len(alt) == 3 {
-									m.PayerIDs.KeyAuth.Allowed = true
-									m.PayerIDs.KeyAuth.Mandatory, _ = alt[1].(bool)
-									m.PayerIDs.KeyAuth.K1, _ = alt[2].(string)
-								}
-							case "text/identifier":
-								m.PayerIDs.LightningAddress = true
-							case "text/email":
-								m.PayerIDs.Email = true
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 
@@ -229,8 +313,8 @@ func (m *Metadata) UnmarshalJSON(src []byte) error {
 }
 
 func (m Metadata) MarshalJSON() ([]byte, error) {
-	if m.Encoded != "" {
-		return json.Marshal(m.Encoded)
+	if m.Encoded != nil {
+		return m.Encoded, nil
 	}
 
 	raw := make([]interface{}, 0, 5)
@@ -255,43 +339,19 @@ func (m Metadata) MarshalJSON() ([]byte, error) {
 		raw = append(raw, []string{tag, m.LightningAddress})
 	}
 
-	payerIDs := []interface{}{"application/payer-ids"}
-	if m.PayerIDs.FreeName {
-		payerIDs = append(payerIDs, []string{"text/plain"})
-	}
-	if m.PayerIDs.PubKey {
-		payerIDs = append(payerIDs, []string{"application/pubkey"})
-	}
-	if m.PayerIDs.LightningAddress {
-		payerIDs = append(payerIDs, []string{"text/identifier"})
-	}
-	if m.PayerIDs.Email {
-		payerIDs = append(payerIDs, []string{"text/email"})
-	}
-	if m.PayerIDs.KeyAuth.Allowed {
-		payerIDs = append(payerIDs, []interface{}{
-			"application/lnurl-auth",
-			m.PayerIDs.KeyAuth.Mandatory,
-			m.PayerIDs.KeyAuth.K1,
-		})
-	}
-	if len(payerIDs) > 1 {
-		raw = append(raw, payerIDs)
-	}
-
-	j, err := json.Marshal(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(string(j))
+	return json.Marshal(raw)
 }
 
 func (m Metadata) Hash() [32]byte {
 	j, _ := json.Marshal(m)
 
-	var raw string
-	json.Unmarshal(j, &raw)
+	return sha256.Sum256(j)
+}
 
-	return sha256.Sum256([]byte(raw))
+func (m Metadata) HashWithPayerData(payerDataJSON string) [32]byte {
+	j, _ := json.Marshal(m)
+
+	metadataPlusPayerData := append(j, payerDataJSON...)
+
+	return sha256.Sum256(metadataPlusPayerData)
 }
