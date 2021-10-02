@@ -312,46 +312,45 @@ func (m *Metadata) UnmarshalJSON(src []byte) error {
 	return nil
 }
 
-func (m Metadata) MarshalJSON() ([]byte, error) {
-	if m.Encoded != nil {
-		return m.Encoded, nil
-	}
+func (m Metadata) Encode() []byte {
+	if m.Encoded == nil {
+		raw := make([]interface{}, 0, 5)
+		raw = append(raw, []string{"text/plain", m.Description})
 
-	raw := make([]interface{}, 0, 5)
-	raw = append(raw, []string{"text/plain", m.Description})
-
-	if m.LongDescription != "" {
-		raw = append(raw, []string{"text/long-desc", m.LongDescription})
-	}
-
-	if m.Image.Bytes != nil {
-		raw = append(raw, []string{"image/" + m.Image.Ext + ";base64",
-			base64.StdEncoding.EncodeToString(m.Image.Bytes)})
-	} else if m.Image.DataURI != "" {
-		raw = append(raw, strings.SplitN(m.Image.DataURI[5:], ",", 2))
-	}
-
-	if m.LightningAddress != "" {
-		tag := "text/identifier"
-		if m.IsEmail {
-			tag = "text/email"
+		if m.LongDescription != "" {
+			raw = append(raw, []string{"text/long-desc", m.LongDescription})
 		}
-		raw = append(raw, []string{tag, m.LightningAddress})
+
+		if m.Image.Bytes != nil {
+			raw = append(raw, []string{"image/" + m.Image.Ext + ";base64",
+				base64.StdEncoding.EncodeToString(m.Image.Bytes)})
+		} else if m.Image.DataURI != "" {
+			raw = append(raw, strings.SplitN(m.Image.DataURI[5:], ",", 2))
+		}
+
+		if m.LightningAddress != "" {
+			tag := "text/identifier"
+			if m.IsEmail {
+				tag = "text/email"
+			}
+			raw = append(raw, []string{tag, m.LightningAddress})
+		}
+
+		m.Encoded, _ = json.Marshal(raw)
 	}
 
-	return json.Marshal(raw)
+	return m.Encoded
+}
+
+func (m Metadata) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(m.Encode()))
 }
 
 func (m Metadata) Hash() [32]byte {
-	j, _ := json.Marshal(m)
-
-	return sha256.Sum256(j)
+	return sha256.Sum256(m.Encode())
 }
 
 func (m Metadata) HashWithPayerData(payerDataJSON string) [32]byte {
-	j, _ := json.Marshal(m)
-
-	metadataPlusPayerData := append(j, payerDataJSON...)
-
+	metadataPlusPayerData := append(m.Encode(), payerDataJSON...)
 	return sha256.Sum256(metadataPlusPayerData)
 }
