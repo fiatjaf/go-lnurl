@@ -335,30 +335,7 @@ func (params LNURLPayParams) Call(
 
 func (params LNURLPayParams) MetadataEncoded() string {
 	if params.EncodedMetadata == "" {
-		raw := make([]interface{}, 0, 5)
-		raw = append(raw, []string{"text/plain", params.Metadata.Description})
-
-		if params.Metadata.LongDescription != "" {
-			raw = append(raw, []string{"text/long-desc", params.Metadata.LongDescription})
-		}
-
-		if params.Metadata.Image.Bytes != nil {
-			raw = append(raw, []string{"image/" + params.Metadata.Image.Ext + ";base64",
-				base64.StdEncoding.EncodeToString(params.Metadata.Image.Bytes)})
-		} else if params.Metadata.Image.DataURI != "" {
-			raw = append(raw, strings.SplitN(params.Metadata.Image.DataURI[5:], ",", 2))
-		}
-
-		if params.Metadata.LightningAddress != "" {
-			tag := "text/identifier"
-			if params.Metadata.IsEmail {
-				tag = "text/email"
-			}
-			raw = append(raw, []string{tag, params.Metadata.LightningAddress})
-		}
-
-		enc, _ := json.Marshal(raw)
-		params.EncodedMetadata = string(enc)
+		params.EncodedMetadata = params.Metadata.Encode()
 	}
 
 	return params.EncodedMetadata
@@ -371,4 +348,31 @@ func (params LNURLPayParams) HashMetadata() [32]byte {
 func (params LNURLPayParams) HashWithPayerData(payerDataJSON string) [32]byte {
 	metadataPlusPayerData := params.MetadataEncoded() + payerDataJSON
 	return sha256.Sum256([]byte(metadataPlusPayerData))
+}
+
+func (metadata Metadata) Encode() string {
+	raw := make([]interface{}, 0, 5)
+	raw = append(raw, []string{"text/plain", metadata.Description})
+
+	if metadata.LongDescription != "" {
+		raw = append(raw, []string{"text/long-desc", metadata.LongDescription})
+	}
+
+	if metadata.Image.Bytes != nil {
+		raw = append(raw, []string{"image/" + metadata.Image.Ext + ";base64",
+			base64.StdEncoding.EncodeToString(metadata.Image.Bytes)})
+	} else if metadata.Image.DataURI != "" {
+		raw = append(raw, strings.SplitN(metadata.Image.DataURI[5:], ",", 2))
+	}
+
+	if metadata.LightningAddress != "" {
+		tag := "text/identifier"
+		if metadata.IsEmail {
+			tag = "text/email"
+		}
+		raw = append(raw, []string{tag, metadata.LightningAddress})
+	}
+
+	enc, _ := json.Marshal(raw)
+	return string(enc)
 }
