@@ -78,13 +78,13 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 
 	switch j.Get("tag").String() {
 	case "withdrawRequest":
-		value, err := HandleWithdraw(j)
+		value, err := HandleWithdraw(b)
 		return rawurl, value, err
 	case "payRequest":
-		value, err := HandlePay(j)
+		value, err := HandlePay(b)
 		return rawurl, value, err
 	case "channelRequest":
-		value, err := HandleChannel(j)
+		value, err := HandleChannel(b)
 		return rawurl, value, err
 	default:
 		return rawurl, nil, errors.New("unknown response tag " + j.String())

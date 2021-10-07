@@ -1,10 +1,9 @@
 package lnurl
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
-
-	"github.com/tidwall/gjson"
 )
 
 type LNURLChannelResponse struct {
@@ -18,22 +17,18 @@ type LNURLChannelResponse struct {
 
 func (_ LNURLChannelResponse) LNURLKind() string { return "lnurl-channel" }
 
-func HandleChannel(j gjson.Result) (LNURLParams, error) {
-	k1 := j.Get("k1").String()
-	if k1 == "" {
-		return nil, errors.New("k1 is blank")
+func HandleChannel(raw []byte) (LNURLParams, error) {
+	var params LNURLChannelResponse
+	err := json.Unmarshal(raw, &params)
+	if err != nil {
+		return nil, err
 	}
-	callback := j.Get("callback").String()
-	callbackURL, err := url.Parse(callback)
+
+	callbackURL, err := url.Parse(params.Callback)
 	if err != nil {
 		return nil, errors.New("callback is not a valid URL")
 	}
+	params.CallbackURL = callbackURL
 
-	return LNURLChannelResponse{
-		Tag:         "channelRequest",
-		K1:          k1,
-		Callback:    callback,
-		CallbackURL: callbackURL,
-		URI:         j.Get("uri").String(),
-	}, nil
+	return params, nil
 }

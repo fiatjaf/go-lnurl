@@ -1,11 +1,10 @@
 package lnurl
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
 	"strconv"
-
-	"github.com/tidwall/gjson"
 )
 
 type LNURLWithdrawResponse struct {
@@ -22,23 +21,20 @@ type LNURLWithdrawResponse struct {
 
 func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
 
-func HandleWithdraw(j gjson.Result) (LNURLParams, error) {
-	callback := j.Get("callback").String()
-	callbackURL, err := url.Parse(callback)
+func HandleWithdraw(raw []byte) (LNURLParams, error) {
+	var params LNURLWithdrawResponse
+	err := json.Unmarshal(raw, &params)
+	if err != nil {
+		return nil, err
+	}
+
+	callbackURL, err := url.Parse(params.Callback)
 	if err != nil {
 		return nil, errors.New("callback is not a valid URL")
 	}
+	params.CallbackURL = callbackURL
 
-	return LNURLWithdrawResponse{
-		Tag:                "withdrawRequest",
-		K1:                 j.Get("k1").String(),
-		Callback:           callback,
-		CallbackURL:        callbackURL,
-		MaxWithdrawable:    j.Get("maxWithdrawable").Int(),
-		MinWithdrawable:    j.Get("minWithdrawable").Int(),
-		DefaultDescription: j.Get("defaultDescription").String(),
-		BalanceCheck:       j.Get("balanceCheck").String(),
-	}, nil
+	return params, nil
 }
 
 func HandleFastWithdraw(query url.Values) (LNURLParams, bool) {

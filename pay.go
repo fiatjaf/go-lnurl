@@ -13,7 +13,6 @@ import (
 	"time"
 
 	decodepay "github.com/fiatjaf/ln-decodepay"
-	"github.com/tidwall/gjson"
 )
 
 var (
@@ -95,8 +94,8 @@ type PayerDataItemSpec struct {
 }
 
 type PayerDataKeyAuthSpec struct {
-	*PayerDataItemSpec
-	K1 string `json:"k1"`
+	Mandatory bool   `json:"mandatory"`
+	K1        string `json:"k1"`
 }
 
 type LNURLPayValues struct {
@@ -163,16 +162,14 @@ func (sa *SuccessAction) Decipher(preimage []byte) (content string, err error) {
 
 func (_ LNURLPayParams) LNURLKind() string { return "lnurl-pay" }
 
-func HandlePay(j gjson.Result) (LNURLParams, error) {
+func HandlePay(raw []byte) (LNURLParams, error) {
 	var params LNURLPayParams
-	err := json.Unmarshal([]byte(j.Raw), &params)
+	err := json.Unmarshal(raw, &params)
 	if err != nil {
 		return nil, err
 	}
 
 	// parse metadata
-	strmetadata := j.Get("metadata").String()
-	var metadata Metadata
 	var array []interface{}
 	if err := json.Unmarshal([]byte(params.EncodedMetadata), &array); err != nil {
 		return params, err
@@ -204,8 +201,7 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	}
 
 	// parse url
-	callback := j.Get("callback").String()
-	callbackURL, err := url.Parse(callback)
+	callbackURL, err := url.Parse(params.Callback)
 	if err != nil {
 		return nil, errors.New("callback is not a valid URL")
 	}
@@ -214,21 +210,9 @@ func HandlePay(j gjson.Result) (LNURLParams, error) {
 	qs := callbackURL.Query()
 	qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
 	callbackURL.RawQuery = qs.Encode()
+	params.Callback = callbackURL.String()
 
-	// unmarshal payerdata
-	var payerData PayerDataSpec
-	json.Unmarshal([]byte(j.Get("payerData").String()), &payerData)
-
-	return LNURLPayParams{
-		Tag:             "payRequest",
-		Callback:        callbackURL.String(),
-		EncodedMetadata: strmetadata,
-		Metadata:        metadata,
-		MaxSendable:     j.Get("maxSendable").Int(),
-		MinSendable:     j.Get("minSendable").Int(),
-		CommentAllowed:  j.Get("commentAllowed").Int(),
-		PayerData:       payerData,
-	}, nil
+	return params, nil
 }
 
 func (params LNURLPayParams) Call(
@@ -256,6 +240,7 @@ func (params LNURLPayParams) Call(
 		(payerdata == nil || payerdata.PubKey == "") {
 		return nil, fmt.Errorf("pubkey is mandatory")
 	}
+
 	if params.PayerData.KeyAuth != nil &&
 		params.PayerData.KeyAuth.Mandatory &&
 		(payerdata == nil || payerdata.KeyAuth == nil) {
