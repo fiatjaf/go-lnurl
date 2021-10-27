@@ -28,6 +28,17 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 		}
 	} else if strings.HasPrefix(rawlnurl, "http") {
 		rawurl = rawlnurl
+	} else if strings.HasPrefix(rawlnurl, "lnurlp:") ||
+		strings.HasPrefix(rawlnurl, "lnurlw:") ||
+		strings.HasPrefix(rawlnurl, "lnurla:") ||
+		strings.HasPrefix(rawlnurl, "keyauth:") {
+
+		scheme := "https://"
+		if strings.Contains(rawurl, ".onion/") || strings.HasSuffix(rawurl, ".onion") {
+			scheme = "http://"
+		}
+		location := strings.SplitN(rawlnurl, ":", 2)[1]
+		rawurl = scheme + location
 	} else {
 		lnurl, ok := FindLNURLInText(rawlnurl)
 		if !ok {
