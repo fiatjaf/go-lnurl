@@ -17,6 +17,7 @@ type LNURLWithdrawResponse struct {
 	MinWithdrawable    int64    `json:"minWithdrawable"`
 	DefaultDescription string   `json:"defaultDescription"`
 	BalanceCheck       string   `json:"balanceCheck,omitempty"`
+	PayLink            string   `json:"payLink,omitempty"`
 }
 
 func (_ LNURLWithdrawResponse) LNURLKind() string { return "lnurl-withdraw" }
@@ -55,6 +56,7 @@ func HandleFastWithdraw(query url.Values) (LNURLParams, bool) {
 		return nil, false
 	}
 	balanceCheck := query.Get("balanceCheck")
+	payLink := query.Get("payLink")
 
 	return LNURLWithdrawResponse{
 		Tag:                "withdrawRequest",
@@ -65,5 +67,6 @@ func HandleFastWithdraw(query url.Values) (LNURLParams, bool) {
 		MinWithdrawable:    minWithdrawable,
 		DefaultDescription: query.Get("defaultDescription"),
 		BalanceCheck:       balanceCheck,
+		PayLink:            payLink,
 	}, true
 }
