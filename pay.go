@@ -58,13 +58,13 @@ func AESAction(description string, preimage []byte, content string) (*SuccessAct
 
 type LNURLPayParams struct {
 	LNURLResponse
-	Callback        string        `json:"callback"`
-	Tag             string        `json:"tag"`
-	MaxSendable     int64         `json:"maxSendable"`
-	MinSendable     int64         `json:"minSendable"`
-	EncodedMetadata string        `json:"metadata"`
-	CommentAllowed  int64         `json:"commentAllowed"`
-	PayerData       PayerDataSpec `json:"payerData,omitempty"`
+	Callback        string         `json:"callback"`
+	Tag             string         `json:"tag"`
+	MaxSendable     int64          `json:"maxSendable"`
+	MinSendable     int64          `json:"minSendable"`
+	EncodedMetadata string         `json:"metadata"`
+	CommentAllowed  int64          `json:"commentAllowed"`
+	PayerData       *PayerDataSpec `json:"payerData,omitempty"`
 
 	Metadata Metadata `json:"-"`
 }
