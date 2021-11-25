@@ -169,10 +169,18 @@ func HandlePay(raw []byte) (LNURLParams, error) {
 		return nil, err
 	}
 
+	if err := params.Normalize(); err != nil {
+		return params, err
+	}
+
+	return params, nil
+}
+
+func (params *LNURLPayParams) Normalize() error {
 	// parse metadata
 	var array []interface{}
 	if err := json.Unmarshal([]byte(params.EncodedMetadata), &array); err != nil {
-		return params, err
+		return err
 	}
 	for _, item := range array {
 		entry, _ := item.([]interface{})
@@ -203,7 +211,7 @@ func HandlePay(raw []byte) (LNURLParams, error) {
 	// parse url
 	callbackURL, err := url.Parse(params.Callback)
 	if err != nil {
-		return nil, errors.New("callback is not a valid URL")
+		return errors.New("callback is not a valid URL")
 	}
 
 	// add random nonce to avoid caches
@@ -212,7 +220,7 @@ func HandlePay(raw []byte) (LNURLParams, error) {
 	callbackURL.RawQuery = qs.Encode()
 	params.Callback = callbackURL.String()
 
-	return params, nil
+	return nil
 }
 
 func (params LNURLPayParams) Call(
