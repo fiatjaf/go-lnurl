@@ -228,31 +228,32 @@ func (params LNURLPayParams) Call(
 	comment string,
 	payerdata *PayerDataValues,
 ) (*LNURLPayValues, error) {
-	if params.PayerData.Email != nil &&
-		params.PayerData.Email.Mandatory &&
-		(payerdata == nil || payerdata.Email == "") {
-		return nil, fmt.Errorf("email is mandatory")
-	}
-	if params.PayerData.LightningAddress != nil &&
-		params.PayerData.LightningAddress.Mandatory &&
-		(payerdata == nil || payerdata.LightningAddress == "") {
-		return nil, fmt.Errorf("lightning address is mandatory")
-	}
-	if params.PayerData.FreeName != nil &&
-		params.PayerData.FreeName.Mandatory &&
-		(payerdata == nil || payerdata.FreeName == "") {
-		return nil, fmt.Errorf("name is mandatory")
-	}
-	if params.PayerData.PubKey != nil &&
-		params.PayerData.PubKey.Mandatory &&
-		(payerdata == nil || payerdata.PubKey == "") {
-		return nil, fmt.Errorf("pubkey is mandatory")
-	}
-
-	if params.PayerData.KeyAuth != nil &&
-		params.PayerData.KeyAuth.Mandatory &&
-		(payerdata == nil || payerdata.KeyAuth == nil) {
-		return nil, fmt.Errorf("auth is mandatory")
+	if params.PayerData != nil {
+		if params.PayerData.Email != nil &&
+			params.PayerData.Email.Mandatory &&
+			(payerdata == nil || payerdata.Email == "") {
+			return nil, fmt.Errorf("email is mandatory")
+		}
+		if params.PayerData.LightningAddress != nil &&
+			params.PayerData.LightningAddress.Mandatory &&
+			(payerdata == nil || payerdata.LightningAddress == "") {
+			return nil, fmt.Errorf("lightning address is mandatory")
+		}
+		if params.PayerData.FreeName != nil &&
+			params.PayerData.FreeName.Mandatory &&
+			(payerdata == nil || payerdata.FreeName == "") {
+			return nil, fmt.Errorf("name is mandatory")
+		}
+		if params.PayerData.PubKey != nil &&
+			params.PayerData.PubKey.Mandatory &&
+			(payerdata == nil || payerdata.PubKey == "") {
+			return nil, fmt.Errorf("pubkey is mandatory")
+		}
+		if params.PayerData.KeyAuth != nil &&
+			params.PayerData.KeyAuth.Mandatory &&
+			(payerdata == nil || payerdata.KeyAuth == nil) {
+			return nil, fmt.Errorf("auth is mandatory")
+		}
 	}
 
 	callback := params.CallbackURL()
@@ -265,7 +266,7 @@ func (params LNURLPayParams) Call(
 	}
 
 	var payerdataJSON string
-	if params.PayerData.Exists() && payerdata != nil {
+	if params.PayerData != nil && params.PayerData.Exists() && payerdata != nil {
 		j, _ := json.Marshal(payerdata)
 		payerdataJSON = string(j)
 		qs.Set("payerdata", payerdataJSON)
@@ -303,7 +304,7 @@ func (params LNURLPayParams) Call(
 	values.PayerDataJSON = payerdataJSON
 
 	var hhash [32]byte
-	if payerdata != nil && params.PayerData.Exists() {
+	if payerdata != nil && params.PayerData != nil && params.PayerData.Exists() {
 		hhash = params.HashWithPayerData(payerdataJSON)
 	} else {
 		hhash = params.HashMetadata()
