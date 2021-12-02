@@ -216,7 +216,7 @@ func (params *LNURLPayParams) Normalize() error {
 
 	// add random nonce to avoid caches
 	qs := callbackURL.Query()
-	qs.Set("nonce", strconv.FormatInt(time.Now().Unix(), 10))
+	qs.Set("__n", strconv.FormatInt(time.Now().Unix(), 10))
 	callbackURL.RawQuery = qs.Encode()
 	params.Callback = callbackURL.String()
 
