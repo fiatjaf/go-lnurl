@@ -274,7 +274,7 @@ func (params LNURLPayParams) Call(
 
 	callback.RawQuery = qs.Encode()
 
-	resp, err := Client.Get(callback.String())
+	resp, err := actualClient.Get(callback.String())
 	if err != nil {
 		return nil, fmt.Errorf("http error calling '%s': %w",
 			callback.String(), err)
