@@ -101,7 +101,7 @@ type PayerDataKeyAuthSpec struct {
 type LNURLPayValues struct {
 	LNURLResponse
 	SuccessAction *SuccessAction `json:"successAction"`
-	Routes        []struct{}     `json:"routes"` // always empty
+	Routes        interface{}    `json:"routes"` // ignored
 	PR            string         `json:"pr"`
 	Disposable    *bool          `json:"disposable,omitempty"`
 
