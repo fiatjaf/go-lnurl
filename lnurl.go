@@ -19,8 +19,8 @@ type onioncapabletransport struct{}
 
 func (_ onioncapabletransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if strings.HasSuffix(r.URL.Host, ".onion") && TorClient != nil {
-		return TorClient.Transport.RoundTrip(r)
+		return TorClient.Do(r)
 	}
 
-	return Client.Transport.RoundTrip(r)
+	return Client.Do(r)
 }
