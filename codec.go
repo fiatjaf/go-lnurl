@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
+// LNURLDecode takes a lowercase bech32-encoded lnurl string and returns a plain-text https URL.
 func LNURLDecode(lnurl string) (string, error) {
 	switch {
 	case strings.HasPrefix(lnurl, "lnurl1"):
