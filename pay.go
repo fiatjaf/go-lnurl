@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,6 +22,81 @@ var (
 	FALSE *bool = &f
 	TRUE  *bool = &t
 )
+
+func CallPay(
+	metadata string,
+	callback *url.URL,
+	msats int64,
+	comment string,
+	payerdata *PayerDataValues,
+) (*LNURLPayValues, error) {
+	qs := callback.Query()
+	qs.Set("amount", strconv.FormatInt(msats, 10))
+
+	if comment != "" {
+		qs.Set("comment", comment)
+	}
+
+	var payerdataJSON string
+	if payerdata != nil {
+		j, _ := json.Marshal(payerdata)
+		payerdataJSON = string(j)
+		qs.Set("payerdata", payerdataJSON)
+	}
+
+	callback.RawQuery = qs.Encode()
+	resp, err := actualClient.Get(callback.String())
+	if err != nil {
+		return nil, fmt.Errorf("http error calling '%s': %w", callback.String(), err)
+	}
+	defer resp.Body.Close()
+
+	var values LNURLPayValues
+	b, _ := ioutil.ReadAll(resp.Body)
+	if err := json.Unmarshal(b, &values); err != nil {
+		return nil, fmt.Errorf("got invalid JSON from '%s': %w (%s)",
+			callback.String(), err, string(b))
+	}
+
+	if values.Status == "ERROR" {
+		return nil, LNURLErrorResponse{
+			Status: values.Status,
+			Reason: values.Reason,
+			URL:    callback,
+		}
+	}
+
+	inv, err := decodepay.Decodepay(values.PR)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing invoice '%s': %w", values.PR, err)
+	}
+
+	values.ParsedInvoice = inv
+	values.PayerDataJSON = payerdataJSON
+
+	var hhash [32]byte
+	if payerdata != nil {
+		hhash = sha256.Sum256([]byte(metadata + payerdataJSON))
+	} else {
+		hhash = sha256.Sum256([]byte(metadata))
+	}
+
+	if inv.DescriptionHash != hex.EncodeToString(hhash[:]) {
+		return nil, fmt.Errorf("wrong description_hash (expected %s, got %s)",
+			hex.EncodeToString(hhash[:]),
+			inv.DescriptionHash,
+		)
+	}
+
+	if int64(inv.MSatoshi) != msats {
+		return nil, fmt.Errorf("got invoice with wrong amount (wanted %d, got %d)",
+			msats,
+			inv.MSatoshi,
+		)
+	}
+
+	return &values, nil
+}
 
 func Action(text string, url string) *SuccessAction {
 	if url == "" {
@@ -228,7 +304,9 @@ func (params LNURLPayParams) Call(
 	comment string,
 	payerdata *PayerDataValues,
 ) (*LNURLPayValues, error) {
-	if params.PayerData != nil {
+	if params.PayerData == nil || !params.PayerData.Exists() {
+		payerdata = nil
+	} else {
 		if params.PayerData.Email != nil &&
 			params.PayerData.Email.Mandatory &&
 			(payerdata == nil || payerdata.Email == "") {
@@ -256,75 +334,13 @@ func (params LNURLPayParams) Call(
 		}
 	}
 
-	callback := params.CallbackURL()
-
-	qs := callback.Query()
-	qs.Set("amount", strconv.FormatInt(msats, 10))
-
-	if comment != "" {
-		qs.Set("comment", comment)
-	}
-
-	var payerdataJSON string
-	if params.PayerData != nil && params.PayerData.Exists() && payerdata != nil {
-		j, _ := json.Marshal(payerdata)
-		payerdataJSON = string(j)
-		qs.Set("payerdata", payerdataJSON)
-	}
-
-	callback.RawQuery = qs.Encode()
-
-	resp, err := actualClient.Get(callback.String())
-	if err != nil {
-		return nil, fmt.Errorf("http error calling '%s': %w",
-			callback.String(), err)
-	}
-	defer resp.Body.Close()
-
-	var values LNURLPayValues
-	if err := json.NewDecoder(resp.Body).Decode(&values); err != nil {
-		return nil, fmt.Errorf("got invalid JSON from '%s': %w",
-			callback.String(), err)
-	}
-
-	if values.Status == "ERROR" {
-		return nil, LNURLErrorResponse{
-			Status: values.Status,
-			Reason: values.Reason,
-			URL:    callback,
-		}
-	}
-
-	inv, err := decodepay.Decodepay(values.PR)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing invoice '%s': %w", values.PR, err)
-	}
-
-	values.ParsedInvoice = inv
-	values.PayerDataJSON = payerdataJSON
-
-	var hhash [32]byte
-	if payerdata != nil && params.PayerData != nil && params.PayerData.Exists() {
-		hhash = params.HashWithPayerData(payerdataJSON)
-	} else {
-		hhash = params.HashMetadata()
-	}
-
-	if inv.DescriptionHash != hex.EncodeToString(hhash[:]) {
-		return nil, fmt.Errorf("wrong description_hash (expected %s, got %s)",
-			hex.EncodeToString(hhash[:]),
-			inv.DescriptionHash,
-		)
-	}
-
-	if int64(inv.MSatoshi) != msats {
-		return nil, fmt.Errorf("got invoice with wrong amount (wanted %d, got %d)",
-			msats,
-			inv.MSatoshi,
-		)
-	}
-
-	return &values, nil
+	return CallPay(
+		params.MetadataEncoded(),
+		params.CallbackURL(),
+		msats,
+		comment,
+		payerdata,
+	)
 }
 
 func (params LNURLPayParams) MetadataEncoded() string {
@@ -333,15 +349,6 @@ func (params LNURLPayParams) MetadataEncoded() string {
 	}
 
 	return params.EncodedMetadata
-}
-
-func (params LNURLPayParams) HashMetadata() [32]byte {
-	return sha256.Sum256([]byte(params.MetadataEncoded()))
-}
-
-func (params LNURLPayParams) HashWithPayerData(payerDataJSON string) [32]byte {
-	metadataPlusPayerData := params.MetadataEncoded() + payerDataJSON
-	return sha256.Sum256([]byte(metadataPlusPayerData))
 }
 
 func (metadata Metadata) Encode() string {
