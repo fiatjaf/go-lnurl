@@ -5,7 +5,8 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
 
 type LNURLAuthParams struct {
@@ -28,12 +29,12 @@ func VerifySignature(k1, sig, key string) (ok bool, err error) {
 		return false, errors.New("Failed to decode hex.")
 	}
 
-	pubkey, err := btcec.ParsePubKey(bkey, btcec.S256())
+	pubkey, err := btcec.ParsePubKey(bkey)
 	if err != nil {
 		return false, errors.New("Failed to parse pubkey: " + err.Error())
 	}
 
-	signature, err := btcec.ParseDERSignature(bsig, btcec.S256())
+	signature, err := ecdsa.ParseDERSignature(bsig)
 	if err != nil {
 		return false, errors.New("Failed to parse signature: " + err.Error())
 	}
