@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	decodepay "github.com/fiatjaf/ln-decodepay"
+	decodepay "github.com/nbd-wtf/ln-decodepay"
 )
 
 var (
