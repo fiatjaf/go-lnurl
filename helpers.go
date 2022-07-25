@@ -7,13 +7,14 @@ import (
 	"strings"
 )
 
-var lud01regex = regexp.MustCompile(`\b((lnurl)([0-9]{1,}[a-z0-9]+){1})\b`)
-var lud17regex = regexp.MustCompile(`^ *((lnurlp|lnurlw|lnurlc|keyauth):\/\/\S+) *$`)
+var (
+	lud01regex = regexp.MustCompile(`\b((lnurl)([0-9]{1,}[a-z0-9]+){1})\b`)
+	lud17regex = regexp.MustCompile(`^ *((lnurlp|lnurlw|lnurlc|keyauth):\/\/\S+) *$`)
+)
 
 // FindLNURLInText uses a Regular Expression to find a bech32-encoded lnurl string in a blob of text.
 func FindLNURLInText(text string) (lnurl string, ok bool) {
-	text = strings.ToLower(text)
-	results := lud01regex.FindStringSubmatch(text)
+	results := lud01regex.FindStringSubmatch(strings.ToLower(text))
 	if len(results) == 0 {
 		results = lud17regex.FindStringSubmatch(text)
 		if len(results) == 3 {
