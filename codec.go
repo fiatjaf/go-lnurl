@@ -51,7 +51,7 @@ func Parse(s string) (*LNURL, error) {
 	if err != nil {
 		return nil, err
 	}
-	psuf, icann := publicsuffix.PublicSuffix(dom)
+	psuf, icann := publicsuffix.PublicSuffix(tld)
 	return &LNURL{
 		Subdomain:    sub,
 		Domain:       domName,
