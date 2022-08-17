@@ -2,14 +2,93 @@ package lnurl
 
 import (
 	"errors"
+	"fmt"
+	"golang.org/x/net/idna"
+	"golang.org/x/net/publicsuffix"
 	"net/url"
 	"strings"
 )
 
+// LURL embeds net/url and adds extra fields ontop
+type LNURL struct {
+	Subdomain, Domain, TLD, Port, PublicSuffix string
+	ICANN, IsDomain                            bool
+	*url.URL
+}
+
+func (url LNURL) String() string {
+	return url.URL.String()
+}
+
+//Parse mirrors net/url.Parse except instead it returns
+//a tld.URL, which contains extra fields.
+func Parse(s string) (*LNURL, error) {
+	s = addDefaultScheme(s)
+	parsedUrl, err := url.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+	if parsedUrl.Host == "" {
+		return &LNURL{URL: parsedUrl}, nil
+	}
+
+	dom, port := domainPort(parsedUrl.Host)
+	//etld+1
+	etld1, err := publicsuffix.EffectiveTLDPlusOne(dom)
+	if err != nil {
+		return nil, err
+	}
+	//convert to domain name, and tld
+	i := strings.Index(etld1, ".")
+	domName := etld1[0:i]
+	tld := etld1[i+1:]
+	//and subdomain
+	sub := ""
+	if rest := strings.TrimSuffix(dom, "."+etld1); rest != dom {
+		sub = rest
+	}
+	s, err = idna.ToASCII(s)
+	if err != nil {
+		return nil, err
+	}
+	psuf, icann := publicsuffix.PublicSuffix(dom)
+	return &LNURL{
+		Subdomain:    sub,
+		Domain:       domName,
+		TLD:          tld,
+		Port:         port,
+		URL:          parsedUrl,
+		PublicSuffix: psuf,
+		ICANN:        icann,
+		IsDomain:     IsDomainName(domName),
+	}, nil
+}
+
+// adds default scheme //, if nothing is defined at all
+func addDefaultScheme(s string) string {
+	if strings.Index(s, "//") == -1 {
+		return fmt.Sprintf("//%s", s)
+	}
+	return s
+}
+
+// domainPort splits domain.com:8080
+func domainPort(host string) (string, string) {
+	for i := len(host) - 1; i >= 0; i-- {
+		if host[i] == ':' {
+			return host[:i], host[i+1:]
+		} else if host[i] < '0' || host[i] > '9' {
+			return host, ""
+		}
+	}
+	//will only land here if the string is all digits,
+	//net/url should prevent that from happening
+	return host, ""
+}
+
 // LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
 func LNURLDecode(code string) (string, error) {
 	code = strings.ToLower(code)
-
 	switch {
 	case strings.HasPrefix(code, "lnurl1"):
 		// bech32
@@ -26,34 +105,143 @@ func LNURLDecode(code string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-
-		return string(converted), nil
-	case strings.HasPrefix(code, "lnurlp://"),
-		strings.HasPrefix(code, "lnurlw://"),
-		strings.HasPrefix(code, "lnurlc://"),
-		strings.HasPrefix(code, "keyauth://"),
-		strings.HasPrefix(code, "https://"):
-
-		u := "https://" + strings.SplitN(code, "://", 2)[1]
-		if parsed, err := url.Parse(u); err == nil &&
-			strings.HasSuffix(parsed.Host, ".onion") {
-			u = "https://" + strings.SplitN(code, "://", 2)[1]
+		https, err := setScheme(string(converted))
+		if err != nil {
+			return string(converted), err
 		}
-
-		return u, nil
+		return https, nil
+	case strings.HasPrefix(code, "https://"):
+		return code, nil
+	default:
+		https, err := setScheme(code)
+		if err != nil {
+			return "", err
+		}
+		return https, nil
 	}
+}
 
-	return "", errors.New("unrecognized lnurl format: " + code)
+// setHttpsScheme will parse string url to url.Url.
+// if no scheme was found,
+func setScheme(urlString string) (string, error) {
+	u, err := Parse(urlString)
+	if err != nil {
+		return "", err
+	}
+	if !u.IsDomain {
+		return urlString, nil
+	}
+	if u.TLD == "onion" {
+		u.Scheme = "http"
+	} else if u.Scheme != "https" {
+		u.Scheme = "https"
+	}
+	return u.String(), nil
 }
 
 // LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
 func LNURLEncode(actualurl string) (lnurl string, err error) {
-	asbytes := []byte(actualurl)
-	converted, err := ConvertBits(asbytes, 8, 5, true)
-	if err != nil {
-		return
+	encode := func(s string) (string, error) {
+		asbytes := []byte(s)
+		converted, err := ConvertBits(asbytes, 8, 5, true)
+		if err != nil {
+			return lnurl, err
+		}
+
+		lnurl, err = Encode("lnurl", converted)
+		return strings.ToUpper(lnurl), err
 	}
 
-	lnurl, err = Encode("lnurl", converted)
-	return strings.ToUpper(lnurl), err
+	u, err := Parse(actualurl)
+	if err != nil {
+		enc, encErr := encode(actualurl)
+		if encErr != nil {
+			return "", encErr
+		}
+		return enc, err
+	}
+	if !u.IsDomain {
+		return encode(actualurl)
+	}
+	// no onion
+	if u.TLD != "onion" {
+		// check tld
+		if !u.ICANN {
+			enc, encErr := encode(actualurl)
+			if encErr != nil {
+				return "", encErr
+			}
+			return enc, fmt.Errorf("invalid tld: %s", u.TLD)
+		}
+		if u.Scheme != "https" {
+			u.Scheme = "https"
+		}
+
+	} else {
+		u.Scheme = "http"
+	}
+
+	return encode(u.String())
+}
+
+// isDomainName checks if a string is a presentation-format domain name
+// (currently restricted to hostname-compatible "preferred name" LDH labels and
+// SRV-like "underscore labels"; see golang.org/issue/12421).
+func IsDomainName(s string) bool {
+	// The root domain name is valid. See golang.org/issue/45715.
+	if s == "." {
+		return true
+	}
+
+	// See RFC 1035, RFC 3696.
+	// Presentation format has dots before every label except the first, and the
+	// terminal empty label is optional here because we assume fully-qualified
+	// (absolute) input. We must therefore reserve space for the first and last
+	// labels' length octets in wire format, where they are necessary and the
+	// maximum total length is 255.
+	// So our _effective_ maximum is 253, but 254 is not rejected if the last
+	// character is a dot.
+	l := len(s)
+	if l == 0 || l > 254 || l == 254 && s[l-1] != '.' {
+		return false
+	}
+
+	last := byte('.')
+	nonNumeric := false // true once we've seen a letter or hyphen
+	partlen := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		default:
+			return false
+		case 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_':
+			nonNumeric = true
+			partlen++
+		case '0' <= c && c <= '9':
+			// fine
+			partlen++
+		case c == '-':
+			// Byte before dash cannot be dot.
+			if last == '.' {
+				return false
+			}
+			partlen++
+			nonNumeric = true
+		case c == '.':
+			// Byte before dot cannot be dot, dash.
+			if last == '.' || last == '-' {
+				return false
+			}
+			if partlen > 63 || partlen == 0 {
+				return false
+			}
+			partlen = 0
+		}
+		last = c
+	}
+	if last == '-' || partlen > 63 {
+		return false
+	}
+
+	return nonNumeric
 }
