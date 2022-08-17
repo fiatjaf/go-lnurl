@@ -139,40 +139,66 @@ func setScheme(urlString string) (string, error) {
 	return u.String(), nil
 }
 
-// LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
-func LNURLEncode(actualurl string) (lnurl string, err error) {
-	encode := func(s string) (string, error) {
-		asbytes := []byte(s)
-		converted, err := ConvertBits(asbytes, 8, 5, true)
-		if err != nil {
-			return lnurl, err
+func LNURLEncodeWithValidation(actualurl string) (string, error) {
+	lnurl, err := Parse(actualurl)
+	if err != nil {
+		enc, encErr := encode(actualurl)
+		if encErr != nil {
+			return "", encErr
 		}
-
-		lnurl, err = Encode("lnurl", converted)
-		return strings.ToUpper(lnurl), err
+		return enc, fmt.Errorf("invalid url: %s", actualurl)
+	}
+	if !lnurl.IsDomain {
+		enc, encErr := encode(actualurl)
+		if encErr != nil {
+			return "", encErr
+		}
+		return enc, fmt.Errorf("invalid domain: %s", lnurl.TLD)
 	}
 
+	if lnurl.TLD != "onion" {
+		// check tld
+		// check tld
+		if !lnurl.ICANN {
+			enc, encErr := encode(actualurl)
+			if encErr != nil {
+				return "", encErr
+			}
+			return enc, fmt.Errorf("invalid tld: %s", lnurl.TLD)
+		}
+		if lnurl.Scheme != "https" {
+			lnurl.Scheme = "https"
+		}
+
+	} else {
+		lnurl.Scheme = "http"
+	}
+	return encode(lnurl.String())
+}
+
+func encode(s string) (string, error) {
+	asbytes := []byte(s)
+	converted, err := ConvertBits(asbytes, 8, 5, true)
+	if err != nil {
+		return s, err
+	}
+
+	lnurl, err := Encode("lnurl", converted)
+	return strings.ToUpper(lnurl), err
+}
+
+// LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
+func LNURLEncode(actualurl string) (lnurl string, err error) {
 	u, err := Parse(actualurl)
 	if err != nil {
 		enc, encErr := encode(actualurl)
 		if encErr != nil {
 			return "", encErr
 		}
-		return enc, err
-	}
-	if !u.IsDomain {
-		return encode(actualurl)
+		return enc, nil
 	}
 	// no onion
 	if u.TLD != "onion" {
-		// check tld
-		if !u.ICANN {
-			enc, encErr := encode(actualurl)
-			if encErr != nil {
-				return "", encErr
-			}
-			return enc, fmt.Errorf("invalid tld: %s", u.TLD)
-		}
 		if u.Scheme != "https" {
 			u.Scheme = "https"
 		}
