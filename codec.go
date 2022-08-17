@@ -9,6 +9,58 @@ import (
 	"strings"
 )
 
+// LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
+func LNURLDecode(code string) (string, error) {
+	code = strings.ToLower(code)
+
+	switch {
+	case strings.HasPrefix(code, "lnurl1"):
+		// bech32
+		tag, data, err := Decode(code)
+		if err != nil {
+			return "", err
+		}
+
+		if tag != "lnurl" {
+			return "", errors.New("tag is not 'lnurl', but '" + tag + "'")
+		}
+
+		converted, err := ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return "", err
+		}
+
+		return string(converted), nil
+	case strings.HasPrefix(code, "lnurlp://"),
+		strings.HasPrefix(code, "lnurlw://"),
+		strings.HasPrefix(code, "lnurlc://"),
+		strings.HasPrefix(code, "keyauth://"),
+		strings.HasPrefix(code, "https://"):
+
+		u := "https://" + strings.SplitN(code, "://", 2)[1]
+		if parsed, err := url.Parse(u); err == nil &&
+			strings.HasSuffix(parsed.Host, ".onion") {
+			u = "https://" + strings.SplitN(code, "://", 2)[1]
+		}
+
+		return u, nil
+	}
+
+	return "", errors.New("unrecognized lnurl format: " + code)
+}
+
+// LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
+func LNURLEncode(actualurl string) (lnurl string, err error) {
+	asbytes := []byte(actualurl)
+	converted, err := ConvertBits(asbytes, 8, 5, true)
+	if err != nil {
+		return
+	}
+
+	lnurl, err = Encode("lnurl", converted)
+	return strings.ToUpper(lnurl), err
+}
+
 // LURL embeds net/url and adds extra fields ontop
 type LNURL struct {
 	Subdomain, Domain, TLD, Port, PublicSuffix string
@@ -87,7 +139,7 @@ func domainPort(host string) (string, string) {
 }
 
 // LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
-func LNURLDecode(code string) (string, error) {
+func LNURLDecodeStrict(code string) (string, error) {
 	code = strings.ToLower(code)
 	switch {
 	case strings.HasPrefix(code, "lnurl1"):
@@ -139,7 +191,7 @@ func setScheme(urlString string) (string, error) {
 	return u.String(), nil
 }
 
-func LNURLEncodeWithValidation(actualurl string) (string, error) {
+func LNURLEncodeStrict(actualurl string) (string, error) {
 	lnurl, err := Parse(actualurl)
 	if err != nil {
 		enc, encErr := encode(actualurl)
@@ -185,29 +237,6 @@ func encode(s string) (string, error) {
 
 	lnurl, err := Encode("lnurl", converted)
 	return strings.ToUpper(lnurl), err
-}
-
-// LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
-func LNURLEncode(actualurl string) (lnurl string, err error) {
-	u, err := Parse(actualurl)
-	if err != nil {
-		enc, encErr := encode(actualurl)
-		if encErr != nil {
-			return "", encErr
-		}
-		return enc, nil
-	}
-	// no onion
-	if u.TLD != "onion" {
-		if u.Scheme != "https" {
-			u.Scheme = "https"
-		}
-
-	} else {
-		u.Scheme = "http"
-	}
-
-	return encode(u.String())
 }
 
 // isDomainName checks if a string is a presentation-format domain name
