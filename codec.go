@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -64,12 +65,16 @@ func LNURLEncode(actualurl string) (lnurl string, err error) {
 // LURL embeds net/url and adds extra fields ontop
 type LNURL struct {
 	Subdomain, Domain, TLD, Port, PublicSuffix string
-	ICANN, IsDomain                            bool
+	ICANN, IsDomain, IsIp                      bool
 	*url.URL
 }
 
-func (url LNURL) String() string {
-	return url.URL.String()
+func (u LNURL) String() string {
+	decodedValue, err := url.QueryUnescape(u.URL.String())
+	if err != nil {
+		return ""
+	}
+	return decodedValue
 }
 
 //Parse mirrors net/url.Parse except instead it returns
@@ -99,7 +104,7 @@ func Parse(s string) (*LNURL, error) {
 	if rest := strings.TrimSuffix(dom, "."+etld1); rest != dom {
 		sub = rest
 	}
-	s, err = idna.ToASCII(s)
+	s, err = idna.New(idna.ValidateForRegistration()).ToASCII(dom)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +117,8 @@ func Parse(s string) (*LNURL, error) {
 		URL:          parsedUrl,
 		PublicSuffix: psuf,
 		ICANN:        icann,
-		IsDomain:     IsDomainName(domName),
+		IsDomain:     IsDomainName(s),
+		IsIp:         net.ParseIP(dom) != nil,
 	}, nil
 }
 
@@ -180,6 +186,10 @@ func setScheme(urlString string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if u.IsIp {
+		u.Scheme = "https"
+		return u.String(), nil
+	}
 	if !u.IsDomain {
 		return urlString, nil
 	}
@@ -200,6 +210,11 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 		}
 		return enc, fmt.Errorf("invalid url: %s", actualurl)
 	}
+	if lnurl.IsIp {
+		// actualurl is an ip. just change scheme
+		lnurl.Scheme = "https"
+		return encode(lnurl.String())
+	}
 	if !lnurl.IsDomain {
 		enc, encErr := encode(actualurl)
 		if encErr != nil {
@@ -209,8 +224,7 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 	}
 
 	if lnurl.TLD != "onion" {
-		// check tld
-		// check tld
+		// check TLD
 		if !lnurl.ICANN {
 			enc, encErr := encode(actualurl)
 			if encErr != nil {

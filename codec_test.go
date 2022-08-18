@@ -20,6 +20,12 @@ func TestLNURLDecodeStrict(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
+		{desc: "ip_change_scheme",
+			args: args{code: "lnurl1dp68gup69uhnzt339ccjuvf0wccj7mrww4exctmsv9usux0rql"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
+			want: "https://1.1.1.1/v1/lnurl/pay"},
+		{desc: "ip_keep_scheme",
+			args: args{code: "lnurl1dp68gurn8ghj7vfwxyhrzt339amrztmvde6hymp0wpshjr50pch"}, // https://1.1.1.1/v1/lnurl/pay
+			want: "https://1.1.1.1/v1/lnurl/pay"},
 		{desc: "change_scheme",
 			args: args{code: "lnurl1d3h82unvwqaz7tmpwp5juenfv96x5ctx9e3k7mf0wccj7mrww4exctmsv9usxr8j98"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
 			want: "https://api.fiatjaf.com/v1/lnurl/pay"},
@@ -84,9 +90,21 @@ func TestLNURLEncodeStrict(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
+		{desc: "punycode_change_scheme",
+			args: args{actualurl: "http://看.com"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghjleuu3vhxxmmdrmldr8")}, // https://看.com
+		{desc: "punycode_keep_scheme",
+			args: args{actualurl: "http://看.com"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghjleuu3vhxxmmdrmldr8")}, // https://看.com
+		{desc: "ip_and_port_change_scheme",
+			args: args{actualurl: "lnurlp://1.1.1.1:8080/v1/lnurl/pay"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghj7vfwxyhrzt338gurqwps9amrztmvde6hymp0wpshjtl57q3")}, // https://1.1.1.1:8080/v1/lnurl/pay
+		{desc: "ip_change_scheme",
+			args: args{actualurl: "lnurlp://1.1.1.1/v1/lnurl/pay"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghj7vfwxyhrzt339amrztmvde6hymp0wpshjr50pch")}, // https://1.1.1.1/v1/lnurl/pay
 		{desc: "invalid_tld_want_error",
-			args: args{actualurl: "lnurl.com.orgs"},                                      //invalid tld
-			want: strings.ToUpper("LNURL1D3H82UNV9E3K7MFWDAEXWUCYVANJJ"), wantErr: true}, // lnurl.com.orgs
+			args: args{actualurl: "lnurl.com.btc"},                                     //invalid tld
+			want: strings.ToUpper("LNURL1D3H82UNV9E3K7MFWVF6XXSVAUH5"), wantErr: true}, // lnurl.com.btc
 		{desc: "invalid_domain_name",
 			args: args{actualurl: "lnurl"},
 			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: true},
