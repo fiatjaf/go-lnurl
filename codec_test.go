@@ -20,48 +20,51 @@ func TestLNURLDecodeStrict(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{desc: "ip_change_scheme",
-			args: args{code: "lnurl1dp68gup69uhnzt339ccjuvf0wccj7mrww4exctmsv9usux0rql"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
-			want: "https://1.1.1.1/v1/lnurl/pay"},
-		{desc: "ip_keep_scheme",
-			args: args{code: "lnurl1dp68gurn8ghj7vfwxyhrzt339amrztmvde6hymp0wpshjr50pch"}, // https://1.1.1.1/v1/lnurl/pay
-			want: "https://1.1.1.1/v1/lnurl/pay"},
-		{desc: "change_scheme",
-			args: args{code: "lnurl1d3h82unvwqaz7tmpwp5juenfv96x5ctx9e3k7mf0wccj7mrww4exctmsv9usxr8j98"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
-			want: "https://api.fiatjaf.com/v1/lnurl/pay"},
-		{desc: "puny",
-			args: args{code: "lnurl1dp68gurn8ghj77rw95khx7r3wc6kwv3nv3uhyvmpxserscfwvdhk6tmkxyhkcmn4wfkz7urp0y6jmn9j"}, // https://xn--sxqv5g23dyr3a428a.com/v1/lnurl/pay
-			want: "https://xn--sxqv5g23dyr3a428a.com/v1/lnurl/pay"},                                                    // check puny code
-		{desc: "puny2",
-			args: args{code: "lnurl1dp68gurn8ghjle443052l909sxr7t8ulukgg6tnrdakj7a339akxuatjdshhqctea4v3jm"},
-			want: "https://测试假域名.com/v1/lnurl/pay"}, // check puny code
-		{desc: "puny_onion",
-			args: args{code: "lnurl1dp68gup69uh7ddvtazhetevpsljel8l9jzxjummwd9hkutmkxyhkcmn4wfkz7urp0ygc52rr"}, // http://测试假域名.onion/v1/lnurl/pay
-			want: "http://测试假域名.onion/v1/lnurl/pay"},                                                           // check puny onion (not sure know if this is possible)
-		{desc: "puny_onion",
-			args: args{code: "lnurl1dp68gurn8ghj7er0d4skjm3wdahxjmmw9amrztmvde6hymp0wpshjcw5kvw"},
-			want: "http://domain.onion/v1/lnurl/pay"}, // check puny onion (not sure know if this is possible)
-		{desc: "string",
-			args: args{code: "lnurl1d3h82unvjhypn2"},
-			want: "lnurl", wantErr: true}, // invalid domain name. returns error and decoded input
-		{desc: "string_uppercase",
-			args: args{code: strings.ToUpper("lnurl1d3h82unvjhypn2")},
-			want: "lnurl", wantErr: true},
-		{desc: "httpsScheme",
-			args: args{code: "https://lnurl.fiatjaf.com"}, // do noting
-			want: "https://lnurl.fiatjaf.com"},
-		{desc: "lnurlp",
+		{desc: "LUD17_CHANGE_SCHEMA",
 			args: args{code: "lnurlp://lnurl.fiatjaf.com"}, // change scheme
 			want: "https://lnurl.fiatjaf.com"},
-		{desc: "onion",
+		{desc: "ONION_SCHEMA_CHANGE_SCHEMA_ERROR",
 			args: args{code: "onion://lnurl.fiatjaf.onion"}, // change scheme
-			want: "http://lnurl.fiatjaf.onion"},
-		{desc: "encoded_onion",
+			want: "http://lnurl.fiatjaf.onion", wantErr: true},
+		{desc: "LUD17_BECH32_ENCODED_CHANGE_SCHEMA_ERROR",
+			args: args{code: "lnurl1d3h82unvwqaz7tmpwp5juenfv96x5ctx9e3k7mf0wccj7mrww4exctmsv9usxr8j98"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
+			want: "https://api.fiatjaf.com/v1/lnurl/pay", wantErr: true},
+		{desc: "LUD17_BECH32_ENCODED_CHANGE_SCHEMA_IP_ERROR",
+			args: args{code: "lnurl1dp68gup69uhnzt339ccjuvf0wccj7mrww4exctmsv9usux0rql"}, // lnurlp://api.fiatjaf.com/v1/lnurl/pay
+			want: "https://1.1.1.1/v1/lnurl/pay", wantErr: true},
+		{desc: "LUD1_ENCODED_CHANGE_SCHEMA",
+			args: args{code: "lnurl1dp68gurn8ghj7vfwxyhrzt339amrztmvde6hymp0wpshjr50pch"}, // https://1.1.1.1/v1/lnurl/pay
+			want: "https://1.1.1.1/v1/lnurl/pay"},
+		{desc: "LUD1_PUNY_SAME_SCHEMA",
+			args: args{code: "lnurl1dp68gurn8ghj77rw95khx7r3wc6kwv3nv3uhyvmpxserscfwvdhk6tmkxyhkcmn4wfkz7urp0y6jmn9j"}, // https://xn--sxqv5g23dyr3a428a.com/v1/lnurl/pay
+			want: "https://xn--sxqv5g23dyr3a428a.com/v1/lnurl/pay"},                                                    // check puny code
+		{desc: "LUD1_IDN_SAME_SCHEMA",
+			args: args{code: "lnurl1dp68gurn8ghjle443052l909sxr7t8ulukgg6tnrdakj7a339akxuatjdshhqctea4v3jm"},
+			want: "https://测试假域名.com/v1/lnurl/pay"}, // check puny code
+		{desc: "LUD17_BECH32_IDN_CHANGE_SCHEMA_ERROR",
+			args: args{code: "lnurl1d3h82unvwuaz7tlxkk973tu4ukqc0evlnljeprfwvdhk6tmkxyhkcmn4wfkz7urp0y93ltxj"},
+			want: "https://测试假域名.com/v1/lnurl/pay", wantErr: true}, // check puny code
+		{desc: "LUD1_BECH32_ONION_SAME_SCHEMA",
+			args: args{code: "lnurl1dp68gup69uh7ddvtazhetevpsljel8l9jzxjummwd9hkutmkxyhkcmn4wfkz7urp0ygc52rr"}, // http://测试假域名.onion/v1/lnurl/pay
+			want: "http://测试假域名.onion/v1/lnurl/pay"},                                                           // check puny onion (not sure know if this is possible)
+		{desc: "LUD1_BECH32_ONION_CHANGE_SCHEMA_ERROR",
+			args: args{code: "lnurl1dp68gurn8ghj7er0d4skjm3wdahxjmmw9amrztmvde6hymp0wpshjcw5kvw"},
+			want: "http://domain.onion/v1/lnurl/pay", wantErr: true}, // check puny onion (not sure know if this is possible)
+		{desc: "RANDOM_STRING_ERROR",
+			args: args{code: "lnurl1d3h82unvjhypn2"},
+			want: "lnurl", wantErr: true}, // invalid domain name. returns error and decoded input
+		{desc: "RANDOM_STRING_UPPERCASE_ERROR",
+			args: args{code: strings.ToUpper("lnurl1d3h82unvjhypn2")},
+			want: "lnurl", wantErr: true},
+		{desc: "HTTPS",
+			args: args{code: "https://lnurl.fiatjaf.com"}, // do noting
+			want: "https://lnurl.fiatjaf.com"},
+		{desc: "ONION_SCHEMA_CHANGE_SCHEMA_ERROR",
 			args: args{code: "lnurl1dahxjmmw8ghj7mrww4exctnxd9shg6npvchx7mnfdahquxueex"}, // change scheme
-			want: "http://lnurl.fiatjaf.onion"},
-		{desc: "encoded_https_onion",
+			want: "http://lnurl.fiatjaf.onion", wantErr: true},
+		{desc: "ONION_HTTPS_CHANGE_SCHEMA_ERROR",
 			args: args{code: "lnurl1dp68gurn8ghj7mrww4exctnxd9shg6npvchx7mnfdahq874q6e"}, // change scheme
-			want: "http://lnurl.fiatjaf.onion"},
+			want: "http://lnurl.fiatjaf.onion", wantErr: true},
 	}
 	for _, tt := range tests {
 		tt.name = tt.args.code
@@ -89,64 +92,57 @@ func TestLNURLEncodeStrict(t *testing.T) {
 		args    args
 		want    string
 		wantErr bool
-	}{
-		{desc: "punycode_change_scheme",
-			args: args{actualurl: "http://看.com"},
-			want: strings.ToUpper("lnurl1dp68gurn8ghjleuu3vhxxmmdrmldr8")}, // https://看.com
-		{desc: "punycode_keep_scheme",
-			args: args{actualurl: "http://看.com"},
-			want: strings.ToUpper("lnurl1dp68gurn8ghjleuu3vhxxmmdrmldr8")}, // https://看.com
-		{desc: "ip_and_port_change_scheme",
-			args: args{actualurl: "lnurlp://1.1.1.1:8080/v1/lnurl/pay"},
-			want: strings.ToUpper("lnurl1dp68gurn8ghj7vfwxyhrzt338gurqwps9amrztmvde6hymp0wpshjtl57q3")}, // https://1.1.1.1:8080/v1/lnurl/pay
-		{desc: "ip_change_scheme",
-			args: args{actualurl: "lnurlp://1.1.1.1/v1/lnurl/pay"},
-			want: strings.ToUpper("lnurl1dp68gurn8ghj7vfwxyhrzt339amrztmvde6hymp0wpshjr50pch")}, // https://1.1.1.1/v1/lnurl/pay
-		{desc: "invalid_tld_want_error",
-			args: args{actualurl: "lnurl.com.btc"},                                     //invalid tld
-			want: strings.ToUpper("LNURL1D3H82UNV9E3K7MFWVF6XXSVAUH5"), wantErr: true}, // lnurl.com.btc
-		{desc: "invalid_domain_name",
-			args: args{actualurl: "lnurl"},
-			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: true},
-		{desc: "invalid",
-			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                              // invalid tld
-			want: strings.ToUpper("LNURL1D3H82UNV9EKHXENDWDJXKENWWVNXGENPDEJXVCTNV3NQXM32ED"), wantErr: true}, // lnurl.msfmsdkfns&dfandfasdf
-		{desc: "invalid_domain_name",
+	}{{desc: "ONION_SCHEME_ERROR",
+		args: args{actualurl: "onion://lnurl.com"},
+		want: strings.ToUpper("LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKS6NPC70"), wantErr: true},
+		{desc: "INVALID_DOMAIN_NAME_2_ERROR",
 			args: args{actualurl: "lnur%%%l"},
 			want: strings.ToUpper("lnurl1d3h82u39y5jkc45g4zl"), wantErr: true},
-		{desc: "invalid_domain_name",
+		{desc: "IDN_CHANGE_SCHEMA_ERROR",
+			args: args{actualurl: "http://看.com"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghjleuu3vhxxmmdrmldr8"), wantErr: true}, // https://看.com
+		{desc: "NO_SCHEMA_INVALID_TLD_ERROR",
+			args: args{actualurl: "lnurl.com.btc"},                                     //invalid tld
+			want: strings.ToUpper("LNURL1D3H82UNV9E3K7MFWVF6XXSVAUH5"), wantErr: true}, // lnurl.com.btc
+		{desc: "INVALID_DOMAIN_NAME_ERROR",
 			args: args{actualurl: "lnurl"},
-			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: true}, // no domain validation
-		{desc: "invalid_domain_name",
-			args: args{actualurl: "lnur%%%l"},
-			want: strings.ToUpper("lnurl1d3h82u39y5jkc45g4zl"), wantErr: true}, // no domain validation
-		{desc: "onion",
+			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: true},
+		{desc: "INVALID_TLD_ERROR",
+			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                              // invalid tld
+			want: strings.ToUpper("LNURL1D3H82UNV9EKHXENDWDJXKENWWVNXGENPDEJXVCTNV3NQXM32ED"), wantErr: true}, // lnurl.msfmsdkfns&dfandfasdf
+		{desc: "NO_SCHEMA_ERROR",
+			args: args{actualurl: "lnurl.com.org"},
+			want: strings.ToUpper("LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKJUMMJVUK5QJ46"), wantErr: true}, // https://lnurl.com.org,
+		{desc: "NO_SCHEMA_TLD_ERROR",
+			args: args{actualurl: "lnurl.com"},
+			want: "LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKS6NPC70", wantErr: true}, // https://lnurl.com
+		{desc: "COM_ORG_NO_SCHEMA",
+			args: args{actualurl: "lnurl.com.org"},
+			want: strings.ToUpper("LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKJUMMJVUK5QJ46"), wantErr: true}, // https://lnurl.com.org,
+		{desc: "LUD17_P_ONION",
+			args: args{actualurl: "lnurlp://api.fiatjaf.onion/v2/lnurl/pay"},
+			want: "lnurlp://api.fiatjaf.onion/v2/lnurl/pay"}, // http://api.fiatjaf.onion/v2/lnurl/pay
+		{desc: "LUD17_A_ONION",
+			args: args{actualurl: "lnurla://api.fiatjaf.onion/v2/lnurl/pay"},
+			want: "lnurla://api.fiatjaf.onion/v2/lnurl/pay"}, // http://api.fiatjaf.onion/v2/lnurl/pay
+		{desc: "LUD17_W_ONION",
+			args: args{actualurl: "lnurlw://api.fiatjaf.onion/v2/lnurl/pay"},
+			want: "lnurlw://api.fiatjaf.onion/v2/lnurl/pay"}, // https://api.fiatjaf.com/v2/lnurl/pay
+
+		{desc: "LUD17_IP_AND_PORT",
+			args: args{actualurl: "lnurlp://1.1.1.1:8080/v1/lnurl/pay"},
+			want: "lnurlp://1.1.1.1:8080/v1/lnurl/pay"}, // https://1.1.1.1:8080/v1/lnurl/pay
+		{desc: "LUD17_IP",
+			args: args{actualurl: "lnurlp://1.1.1.1/v1/lnurl/pay"},
+			want: "lnurlp://1.1.1.1/v1/lnurl/pay"}, // https://1.1.1.1/v1/lnurl/pay
+
+		{desc: "LUD1_ONION",
 			args: args{actualurl: "http://juhaavcaxhxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion/"},
 			want: strings.ToUpper("lnurl1dp68gup69uhk5atgv9shvcmp0p58smrsxumku6m3xumxy7tp0f3kcerexf5xcmt0wen82vn9wpmxcdtpde4kg6tzwdhhgdrrwdukgtn0de5k7m30p4k848"), wantErr: false},
-		{desc: "com.org",
-			args: args{actualurl: "lnurl.com.org"},
-			want: strings.ToUpper("LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKJUMMJVUK5QJ46"), wantErr: false}, // https://lnurl.com.org,
-		{desc: "com",
-			args: args{actualurl: "lnurl.com"},
-			want: "LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKS6NPC70", wantErr: false}, // https://lnurl.com
-		{desc: "com.org",
-			args: args{actualurl: "lnurl.com.org"},
-			want: strings.ToUpper("LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKJUMMJVUK5QJ46"), wantErr: false}, // https://lnurl.com.org,
-		{desc: "com",
-			args: args{actualurl: "lnurl.com"},
-			want: "LNURL1DP68GURN8GHJ7MRWW4EXCTNRDAKS6NPC70", wantErr: false}, // https://lnurl.com
-		{desc: "lnurlp",
-			args: args{actualurl: "lnurlp://api.fiatjaf.com/v2/lnurl/pay"},
-			want: "LNURL1DP68GURN8GHJ7CTSDYHXV6TPW34XZE3WVDHK6TMKXGHKCMN4WFKZ7URP0Y0Q3PEG"}, // https://api.fiatjaf.com/v2/lnurl/pay
-		{desc: "onion_lnurlp",
-			args: args{actualurl: "lnurlp://api.fiatjaf.onion/v2/lnurl/pay"},
-			want: "LNURL1DP68GUP69UHKZURF9ENXJCT5DFSKVTN0DE5K7M30WCEZ7MRWW4EXCTMSV9USWEVHQG"}, // http://api.fiatjaf.onion/v2/lnurl/pay
-		{desc: "https_onion",
-			args: args{actualurl: "https://api.fiatjaf.onion/v2/lnurl/pay"},
-			want: "LNURL1DP68GUP69UHKZURF9ENXJCT5DFSKVTN0DE5K7M30WCEZ7MRWW4EXCTMSV9USWEVHQG"}, // http://api.fiatjaf.onion/v2/lnurl/pay
-		{desc: "http",
-			args: args{actualurl: "http://api.fiatjaf.com/v2/lnurl/pay"},
-			want: "LNURL1DP68GURN8GHJ7CTSDYHXV6TPW34XZE3WVDHK6TMKXGHKCMN4WFKZ7URP0Y0Q3PEG"}, // https://api.fiatjaf.com/v2/lnurl/pay
+		{desc: "HTTP",
+			args: args{actualurl: "https://api.fiatjaf.com/v2/lnurl/pay"},
+			want: strings.ToUpper("lnurl1dp68gurn8ghj7ctsdyhxv6tpw34xze3wvdhk6tmkxghkcmn4wfkz7urp0y0q3peg")}, // https://api.fiatjaf.com/v2/lnurl/pay
+
 	}
 	for _, tt := range tests {
 		tt.name = tt.args.actualurl
@@ -319,7 +315,7 @@ func TestLNURLEncodeDecode(t *testing.T) {
 		{desc: "lnurlp",
 			args: args{input: "lnurlp://lnurl.fiatjaf.com"}, want: "https://lnurl.fiatjaf.com"}, // will be encoded to https://
 		{desc: "no_scheme_com",
-			args: args{input: "lnurl.fiatjaf.com"}, want: "https://lnurl.fiatjaf.com"},
+			args: args{input: "lnurl.fiatjaf.com"}, want: "https://lnurl.fiatjaf.com", wantErr: true},
 		{desc: "no_domain_string",
 			args: args{input: "lnurl"}, want: "lnurl", wantErr: true},
 	}

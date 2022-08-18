@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+var lud17ValidSchemes = map[string]struct{}{"lnurla": {}, "lnurlp": {}, "lnurlw": {}, "lnurlc": {}, "keyauth": {}}
+var lud1ValidSchemes = map[string]struct{}{"https": {}}
+var lud1ValidOnionSchemes = map[string]struct{}{"http": {}}
+
 // LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
 func LNURLDecode(code string) (string, error) {
 	code = strings.ToLower(code)
@@ -163,42 +167,71 @@ func LNURLDecodeStrict(code string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		https, err := setScheme(string(converted))
+		u, err := parse(string(converted))
 		if err != nil {
 			return string(converted), err
 		}
-		return https, nil
+		if u.isIp {
+			if u.Scheme != "https" {
+				err := fmt.Errorf("invalid scheme: %s", string(converted))
+				u.Scheme = "https"
+				return u.String(), err
+			}
+			return u.String(), nil
+		}
+		if !u.isDomain {
+			return string(converted), fmt.Errorf("invalid domain: %s", string(converted))
+		}
+		if setScheme(u) {
+			return u.String(), fmt.Errorf("invalid scheme: %s", u.Scheme)
+		}
+		return u.String(), nil
 	case strings.HasPrefix(code, "https://"):
 		return code, nil
 	default:
-		https, err := setScheme(code)
+		u, err := parse(code)
 		if err != nil {
 			return "", err
 		}
-		return https, nil
+		lud17 := validLud17(u.Scheme)
+		if setScheme(u) {
+			if !lud17 {
+				return u.String(), fmt.Errorf("invalid scheme: %s", u.Scheme)
+			}
+		}
+		return u.String(), nil
 	}
 }
 
 // setHttpsScheme will parse string url to url.Url.
 // if no scheme was found,
-func setScheme(urlString string) (string, error) {
-	u, err := parse(urlString)
-	if err != nil {
-		return "", err
-	}
-	if u.isIp {
-		u.Scheme = "https"
-		return u.String(), nil
-	}
-	if !u.isDomain {
-		return urlString, nil
-	}
+func setScheme(u *lnUrl) (updated bool) {
 	if u.tld == "onion" {
-		u.Scheme = "http"
-	} else if u.Scheme != "https" {
-		u.Scheme = "https"
+		if u.Scheme != "http" {
+			u.Scheme = "http"
+			updated = true
+		}
+	} else {
+		if u.Scheme != "https" {
+			u.Scheme = "https"
+			updated = true
+		}
 	}
-	return u.String(), nil
+	return
+}
+
+func validLud17(schema string) bool {
+	_, ok := lud17ValidSchemes[schema]
+	return ok
+}
+
+func validLud1(schema string) bool {
+	_, ok := lud1ValidSchemes[schema]
+	return ok
+}
+func validLud1Onion(schema string) bool {
+	_, ok := lud1ValidOnionSchemes[schema]
+	return ok
 }
 
 func LNURLEncodeStrict(actualurl string) (string, error) {
@@ -209,6 +242,9 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 			return "", encErr
 		}
 		return enc, fmt.Errorf("invalid url: %s", actualurl)
+	}
+	if validLud17(lnurl.Scheme) {
+		return lnurl.String(), nil
 	}
 	if lnurl.isIp {
 		// actualurl is an ip. just change scheme
@@ -222,7 +258,7 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 		}
 		return enc, fmt.Errorf("invalid domain: %s", lnurl.tld)
 	}
-
+	updated := false
 	if lnurl.tld != "onion" {
 		// check tld
 		if !lnurl.icann {
@@ -234,12 +270,23 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 		}
 		if lnurl.Scheme != "https" {
 			lnurl.Scheme = "https"
+			updated = true
 		}
 
 	} else {
-		lnurl.Scheme = "http"
+		if lnurl.Scheme != "http" {
+			lnurl.Scheme = "http"
+			updated = true
+		}
 	}
-	return encode(lnurl.String())
+	enc, err := encode(lnurl.String())
+	if err != nil {
+		return enc, err
+	}
+	if updated {
+		return enc, fmt.Errorf("invalid protocol schema: %s", lnurl.Scheme)
+	}
+	return enc, err
 }
 
 func encode(s string) (string, error) {
