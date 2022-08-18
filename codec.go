@@ -63,13 +63,13 @@ func LNURLEncode(actualurl string) (lnurl string, err error) {
 }
 
 // LURL embeds net/url and adds extra fields ontop
-type LNURL struct {
-	Subdomain, Domain, TLD, Port, PublicSuffix string
-	ICANN, IsDomain, IsIp                      bool
+type lnUrl struct {
+	subdomain, domain, tld, port, publicSuffix string
+	icann, isDomain, isIp                      bool
 	*url.URL
 }
 
-func (u LNURL) String() string {
+func (u lnUrl) String() string {
 	decodedValue, err := url.QueryUnescape(u.URL.String())
 	if err != nil {
 		return ""
@@ -77,16 +77,16 @@ func (u LNURL) String() string {
 	return decodedValue
 }
 
-//Parse mirrors net/url.Parse except instead it returns
+//parse mirrors net/url.Parse except instead it returns
 //a tld.URL, which contains extra fields.
-func Parse(s string) (*LNURL, error) {
+func parse(s string) (*lnUrl, error) {
 	s = addDefaultScheme(s)
 	parsedUrl, err := url.Parse(s)
 	if err != nil {
 		return nil, err
 	}
 	if parsedUrl.Host == "" {
-		return &LNURL{URL: parsedUrl}, nil
+		return &lnUrl{URL: parsedUrl}, nil
 	}
 
 	dom, port := domainPort(parsedUrl.Host)
@@ -109,16 +109,16 @@ func Parse(s string) (*LNURL, error) {
 		return nil, err
 	}
 	psuf, icann := publicsuffix.PublicSuffix(tld)
-	return &LNURL{
-		Subdomain:    sub,
-		Domain:       domName,
-		TLD:          tld,
-		Port:         port,
+	return &lnUrl{
+		subdomain:    sub,
+		domain:       domName,
+		tld:          tld,
+		port:         port,
 		URL:          parsedUrl,
-		PublicSuffix: psuf,
-		ICANN:        icann,
-		IsDomain:     IsDomainName(s),
-		IsIp:         net.ParseIP(dom) != nil,
+		publicSuffix: psuf,
+		icann:        icann,
+		isDomain:     IsDomainName(s),
+		isIp:         net.ParseIP(dom) != nil,
 	}, nil
 }
 
@@ -182,18 +182,18 @@ func LNURLDecodeStrict(code string) (string, error) {
 // setHttpsScheme will parse string url to url.Url.
 // if no scheme was found,
 func setScheme(urlString string) (string, error) {
-	u, err := Parse(urlString)
+	u, err := parse(urlString)
 	if err != nil {
 		return "", err
 	}
-	if u.IsIp {
+	if u.isIp {
 		u.Scheme = "https"
 		return u.String(), nil
 	}
-	if !u.IsDomain {
+	if !u.isDomain {
 		return urlString, nil
 	}
-	if u.TLD == "onion" {
+	if u.tld == "onion" {
 		u.Scheme = "http"
 	} else if u.Scheme != "https" {
 		u.Scheme = "https"
@@ -202,7 +202,7 @@ func setScheme(urlString string) (string, error) {
 }
 
 func LNURLEncodeStrict(actualurl string) (string, error) {
-	lnurl, err := Parse(actualurl)
+	lnurl, err := parse(actualurl)
 	if err != nil {
 		enc, encErr := encode(actualurl)
 		if encErr != nil {
@@ -210,27 +210,27 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 		}
 		return enc, fmt.Errorf("invalid url: %s", actualurl)
 	}
-	if lnurl.IsIp {
+	if lnurl.isIp {
 		// actualurl is an ip. just change scheme
 		lnurl.Scheme = "https"
 		return encode(lnurl.String())
 	}
-	if !lnurl.IsDomain {
+	if !lnurl.isDomain {
 		enc, encErr := encode(actualurl)
 		if encErr != nil {
 			return "", encErr
 		}
-		return enc, fmt.Errorf("invalid domain: %s", lnurl.TLD)
+		return enc, fmt.Errorf("invalid domain: %s", lnurl.tld)
 	}
 
-	if lnurl.TLD != "onion" {
-		// check TLD
-		if !lnurl.ICANN {
+	if lnurl.tld != "onion" {
+		// check tld
+		if !lnurl.icann {
 			enc, encErr := encode(actualurl)
 			if encErr != nil {
 				return "", encErr
 			}
-			return enc, fmt.Errorf("invalid tld: %s", lnurl.TLD)
+			return enc, fmt.Errorf("invalid tld: %s", lnurl.tld)
 		}
 		if lnurl.Scheme != "https" {
 			lnurl.Scheme = "https"

@@ -109,7 +109,7 @@ func TestLNURLEncodeStrict(t *testing.T) {
 			args: args{actualurl: "lnurl"},
 			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: true},
 		{desc: "invalid",
-			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                              // invalid TLD
+			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                              // invalid tld
 			want: strings.ToUpper("LNURL1D3H82UNV9EKHXENDWDJXKENWWVNXGENPDEJXVCTNV3NQXM32ED"), wantErr: true}, // lnurl.msfmsdkfns&dfandfasdf
 		{desc: "invalid_domain_name",
 			args: args{actualurl: "lnur%%%l"},
@@ -184,7 +184,7 @@ func TestLNURLEncode(t *testing.T) {
 			args: args{actualurl: "lnurl"},
 			want: strings.ToUpper("lnurl1d3h82unvjhypn2"), wantErr: false},
 		{desc: "invalid",
-			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                               // invalid TLD
+			args: args{actualurl: "lnurl.msfmsdkfns&dfandfasdf"},                                               // invalid tld
 			want: strings.ToUpper("LNURL1D3H82UNV9EKHXENDWDJXKENWWVNXGENPDEJXVCTNV3NQXM32ED"), wantErr: false}, // lnurl.msfmsdkfns&dfandfasdf
 		{desc: "invalid_domain_name",
 			args: args{actualurl: "lnur%%%l"},
