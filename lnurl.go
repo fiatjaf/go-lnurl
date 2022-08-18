@@ -17,6 +17,10 @@ var actualClient = &http.Client{
 
 type onioncapabletransport struct{}
 
+func WithCustomClient(c *http.Client) {
+	actualClient = c
+}
+
 func (_ onioncapabletransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if strings.HasSuffix(r.URL.Host, ".onion") && TorClient != nil {
 		return TorClient.Do(r)
