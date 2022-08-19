@@ -11,8 +11,6 @@ import (
 )
 
 var lud17ValidSchemes = map[string]struct{}{"lnurla": {}, "lnurlp": {}, "lnurlw": {}, "lnurlc": {}, "keyauth": {}}
-var lud1ValidSchemes = map[string]struct{}{"https": {}}
-var lud1ValidOnionSchemes = map[string]struct{}{"http": {}}
 
 // LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
 func LNURLDecode(code string) (string, error) {
@@ -222,15 +220,6 @@ func setScheme(u *lnUrl) (updated bool) {
 
 func validLud17(schema string) bool {
 	_, ok := lud17ValidSchemes[schema]
-	return ok
-}
-
-func validLud1(schema string) bool {
-	_, ok := lud1ValidSchemes[schema]
-	return ok
-}
-func validLud1Onion(schema string) bool {
-	_, ok := lud1ValidOnionSchemes[schema]
 	return ok
 }
 
