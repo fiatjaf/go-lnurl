@@ -146,7 +146,8 @@ func domainPort(host string) (string, string) {
 	return host, ""
 }
 
-// LNURLDecode takes a bech32-encoded lnurl string and returns a plain-text https URL.
+// LNURLDecode takes a string and returns a valid lnurl, if possible.
+// code can be
 func LNURLDecodeStrict(code string) (string, error) {
 	code = strings.ToLower(code)
 	switch {
@@ -191,10 +192,11 @@ func LNURLDecodeStrict(code string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		lud17 := validLud17(u.Scheme)
+		scheme := u.Scheme
+		lud17 := validLud17(scheme)
 		if setScheme(u) {
 			if !lud17 {
-				return u.String(), fmt.Errorf("invalid scheme: %s", u.Scheme)
+				return u.String(), fmt.Errorf("invalid scheme: %s", scheme)
 			}
 		}
 		return u.String(), nil
@@ -218,11 +220,14 @@ func setScheme(u *lnUrl) (updated bool) {
 	return
 }
 
+// validLud17 will return true, if scheme is valid for lud17
 func validLud17(schema string) bool {
 	_, ok := lud17ValidSchemes[schema]
 	return ok
 }
 
+// LNURLEncodeStrict will encode the actualurl to lnurl.
+// based on the input url, it will determine whether bech32 encoding / url manipulation is necessary
 func LNURLEncodeStrict(actualurl string) (string, error) {
 	lnurl, err := parse(actualurl)
 	if err != nil {
@@ -289,7 +294,7 @@ func encode(s string) (string, error) {
 	return strings.ToUpper(lnurl), err
 }
 
-// isDomainName checks if a string is a presentation-format domain name
+// IsDomainName (from net package) checks if a string is a presentation-format domain name
 // (currently restricted to hostname-compatible "preferred name" LDH labels and
 // SRV-like "underscore labels"; see golang.org/issue/12421).
 func IsDomainName(s string) bool {
