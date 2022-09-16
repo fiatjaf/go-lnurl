@@ -33,7 +33,7 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 		strings.HasPrefix(rawlnurl, "keyauth://") {
 
 		scheme := "https:"
-		if strings.Contains(rawurl, ".onion/") || strings.HasSuffix(rawurl, ".onion") {
+		if strings.Contains(rawlnurl, ".onion/") || strings.HasSuffix(rawlnurl, ".onion") {
 			scheme = "http:"
 		}
 		location := strings.SplitN(rawlnurl, ":", 2)[1]
