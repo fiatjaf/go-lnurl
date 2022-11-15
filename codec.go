@@ -19,7 +19,7 @@ func LNURLDecode(code string) (string, error) {
 	switch {
 	case strings.HasPrefix(code, "lnurl1"):
 		// bech32
-		tag, data, err := Decode(code)
+		tag, data, err := decode(code)
 		if err != nil {
 			return "", err
 		}
@@ -28,7 +28,7 @@ func LNURLDecode(code string) (string, error) {
 			return "", errors.New("tag is not 'lnurl', but '" + tag + "'")
 		}
 
-		converted, err := ConvertBits(data, 5, 8, false)
+		converted, err := convertBits(data, 5, 8, false)
 		if err != nil {
 			return "", err
 		}
@@ -55,12 +55,12 @@ func LNURLDecode(code string) (string, error) {
 // LNURLEncode takes a plain-text https URL and returns a bech32-encoded uppercased lnurl string.
 func LNURLEncode(actualurl string) (lnurl string, err error) {
 	asbytes := []byte(actualurl)
-	converted, err := ConvertBits(asbytes, 8, 5, true)
+	converted, err := convertBits(asbytes, 8, 5, true)
 	if err != nil {
 		return
 	}
 
-	lnurl, err = Encode("lnurl", converted)
+	lnurl, err = encode("lnurl", converted)
 	return strings.ToUpper(lnurl), err
 }
 

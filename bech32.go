@@ -9,9 +9,9 @@ const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 var gen = []int{0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3}
 
-// Decode decodes a bech32 encoded string, returning the human-readable
+// decode decodes a bech32 encoded string, returning the human-readable
 // part and the data part excluding the checksum.
-func Decode(bech string) (string, []byte, error) {
+func decode(bech string) (string, []byte, error) {
 	// Only ASCII characters between 33 and 126 are allowed.
 	for i := 0; i < len(bech); i++ {
 		if bech[i] < 33 || bech[i] > 126 {
@@ -68,10 +68,10 @@ func Decode(bech string) (string, []byte, error) {
 	return hrp, decoded[:len(decoded)-6], nil
 }
 
-// Encode encodes a byte slice into a bech32 string with the
+// encode encodes a byte slice into a bech32 string with the
 // human-readable part hrb. Note that the bytes must each encode 5 bits
 // (base32).
-func Encode(hrp string, data []byte) (string, error) {
+func encode(hrp string, data []byte) (string, error) {
 	// Calculate the checksum of the data and append it at the end.
 	checksum := bech32Checksum(hrp, data)
 	combined := append(data, checksum...)
@@ -115,9 +115,9 @@ func toChars(data []byte) (string, error) {
 	return string(result), nil
 }
 
-// ConvertBits converts a byte slice where each byte is encoding fromBits bits,
+// convertBits converts a byte slice where each byte is encoding fromBits bits,
 // to a byte slice where each byte is encoding toBits bits.
-func ConvertBits(data []byte, fromBits, toBits uint8, pad bool) ([]byte, error) {
+func convertBits(data []byte, fromBits, toBits uint8, pad bool) ([]byte, error) {
 	if fromBits < 1 || fromBits > 8 || toBits < 1 || toBits > 8 {
 		return nil, fmt.Errorf("only bit groups between 1 and 8 allowed")
 	}
