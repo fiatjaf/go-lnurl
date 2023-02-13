@@ -146,7 +146,7 @@ func domainPort(host string) (string, string) {
 	return host, ""
 }
 
-// LNURLDecode takes a string and returns a valid lnurl, if possible.
+// LNURLDecodeStrict takes a string and returns a valid lnurl, if possible.
 // code can be
 func LNURLDecodeStrict(code string) (string, error) {
 	code = strings.ToLower(code)
@@ -203,7 +203,7 @@ func LNURLDecodeStrict(code string) (string, error) {
 	}
 }
 
-// setHttpsScheme will parse string url to url.Url.
+// setScheme will parse string url to url.Url.
 // if no scheme was found,
 func setScheme(u *lnUrl) (updated bool) {
 	if u.tld == "onion" {
