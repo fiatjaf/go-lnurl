@@ -3,11 +3,12 @@ package lnurl
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/net/idna"
-	"golang.org/x/net/publicsuffix"
 	"net"
 	"net/url"
 	"strings"
+
+	"golang.org/x/net/idna"
+	"golang.org/x/net/publicsuffix"
 )
 
 var lud17ValidSchemes = map[string]struct{}{"lnurla": {}, "lnurlp": {}, "lnurlw": {}, "lnurlc": {}, "keyauth": {}}
@@ -79,8 +80,8 @@ func (u lnUrl) String() string {
 	return decodedValue
 }
 
-//parse mirrors net/url.Parse except instead it returns
-//a tld.URL, which contains extra fields.
+// parse mirrors net/url.Parse except instead it returns
+// a tld.URL, which contains extra fields.
 func parse(s string) (*lnUrl, error) {
 	s = addDefaultScheme(s)
 	parsedUrl, err := url.Parse(s)
@@ -153,7 +154,7 @@ func LNURLDecodeStrict(code string) (string, error) {
 	switch {
 	case strings.HasPrefix(code, "lnurl1"):
 		// bech32
-		tag, data, err := Decode(code)
+		tag, data, err := decode(code)
 		if err != nil {
 			return "", err
 		}
@@ -162,7 +163,7 @@ func LNURLDecodeStrict(code string) (string, error) {
 			return "", errors.New("tag is not 'lnurl', but '" + tag + "'")
 		}
 
-		converted, err := ConvertBits(data, 5, 8, false)
+		converted, err := convertBits(data, 5, 8, false)
 		if err != nil {
 			return "", err
 		}
@@ -231,7 +232,7 @@ func validLud17(schema string) bool {
 func LNURLEncodeStrict(actualurl string) (string, error) {
 	lnurl, err := parse(actualurl)
 	if err != nil {
-		enc, encErr := encode(actualurl)
+		enc, encErr := Encode(actualurl)
 		if encErr != nil {
 			return "", encErr
 		}
@@ -243,10 +244,10 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 	if lnurl.isIp {
 		// actualurl is an ip. just change scheme
 		lnurl.Scheme = "https"
-		return encode(lnurl.String())
+		return Encode(lnurl.String())
 	}
 	if !lnurl.isDomain {
-		enc, encErr := encode(actualurl)
+		enc, encErr := Encode(actualurl)
 		if encErr != nil {
 			return "", encErr
 		}
@@ -256,7 +257,7 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 	if lnurl.tld != "onion" {
 		// check tld
 		if !lnurl.icann {
-			enc, encErr := encode(actualurl)
+			enc, encErr := Encode(actualurl)
 			if encErr != nil {
 				return "", encErr
 			}
@@ -273,7 +274,7 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 			updated = true
 		}
 	}
-	enc, err := encode(lnurl.String())
+	enc, err := Encode(lnurl.String())
 	if err != nil {
 		return enc, err
 	}
@@ -283,14 +284,14 @@ func LNURLEncodeStrict(actualurl string) (string, error) {
 	return enc, err
 }
 
-func encode(s string) (string, error) {
+func Encode(s string) (string, error) {
 	asbytes := []byte(s)
-	converted, err := ConvertBits(asbytes, 8, 5, true)
+	converted, err := convertBits(asbytes, 8, 5, true)
 	if err != nil {
 		return s, err
 	}
 
-	lnurl, err := Encode("lnurl", converted)
+	lnurl, err := encode("lnurl", converted)
 	return strings.ToUpper(lnurl), err
 }
 
