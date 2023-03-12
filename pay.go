@@ -29,6 +29,7 @@ func CallPay(
 	msats int64,
 	comment string,
 	payerdata *PayerDataValues,
+	zapRequest *string,
 ) (*LNURLPayValues, error) {
 	qs := callback.Query()
 	qs.Set("amount", strconv.FormatInt(msats, 10))
@@ -42,6 +43,10 @@ func CallPay(
 		j, _ := json.Marshal(payerdata)
 		payerdataJSON = string(j)
 		qs.Set("payerdata", payerdataJSON)
+	}
+
+	if zapRequest != nil {
+		qs.Set("nostr", *zapRequest)
 	}
 
 	callback.RawQuery = qs.Encode()
@@ -75,7 +80,9 @@ func CallPay(
 	values.PayerDataJSON = payerdataJSON
 
 	var hhash [32]byte
-	if payerdata != nil {
+	if zapRequest != nil {
+		hhash = sha256.Sum256([]byte(*zapRequest))
+	} else if payerdata != nil {
 		hhash = sha256.Sum256([]byte(metadata + payerdataJSON))
 	} else {
 		hhash = sha256.Sum256([]byte(metadata))
@@ -141,6 +148,8 @@ type LNURLPayParams struct {
 	EncodedMetadata string         `json:"metadata"`
 	CommentAllowed  int64          `json:"commentAllowed"`
 	PayerData       *PayerDataSpec `json:"payerData,omitempty"`
+	AllowsNostr     bool           `json:"allowsNostr"`
+	NostrPubkey     string         `json:"nostrPubkey"`
 
 	Metadata Metadata `json:"-"`
 }
@@ -302,6 +311,7 @@ func (params *LNURLPayParams) Normalize() error {
 func (params LNURLPayParams) Call(
 	msats int64,
 	comment string,
+	zapRequest *string,
 	payerdata *PayerDataValues,
 ) (*LNURLPayValues, error) {
 	if params.PayerData == nil || !params.PayerData.Exists() {
@@ -334,12 +344,17 @@ func (params LNURLPayParams) Call(
 		}
 	}
 
+	if !params.AllowsNostr || params.NostrPubkey == "" {
+		zapRequest = nil
+	}
+
 	return CallPay(
 		params.MetadataEncoded(),
 		params.CallbackURL(),
 		msats,
 		comment,
 		payerdata,
+		zapRequest,
 	)
 }
 
