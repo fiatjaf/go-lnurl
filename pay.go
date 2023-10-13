@@ -1,9 +1,7 @@
 package lnurl
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -73,20 +71,6 @@ func CallPay(
 
 	values.ParsedInvoice = inv
 	values.PayerDataJSON = payerdataJSON
-
-	var hhash [32]byte
-	if payerdata != nil {
-		hhash = sha256.Sum256([]byte(metadata + payerdataJSON))
-	} else {
-		hhash = sha256.Sum256([]byte(metadata))
-	}
-
-	if inv.DescriptionHash != hex.EncodeToString(hhash[:]) {
-		return nil, fmt.Errorf("wrong description_hash (expected %s, got %s)",
-			hex.EncodeToString(hhash[:]),
-			inv.DescriptionHash,
-		)
-	}
 
 	if int64(inv.MSatoshi) != msats {
 		return nil, fmt.Errorf("got invoice with wrong amount (wanted %d, got %d)",
