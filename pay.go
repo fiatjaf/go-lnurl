@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"strconv"
 	"strings"
@@ -52,7 +52,7 @@ func CallPay(
 	defer resp.Body.Close()
 
 	var values LNURLPayValues
-	b, _ := ioutil.ReadAll(resp.Body)
+	b, _ := io.ReadAll(resp.Body)
 	if err := json.Unmarshal(b, &values); err != nil {
 		return nil, fmt.Errorf("got invalid JSON from '%s': %w (%s)",
 			callback.String(), err, string(b))
@@ -360,8 +360,10 @@ func (metadata Metadata) Encode() string {
 	}
 
 	if metadata.Image.Bytes != nil {
-		raw = append(raw, []string{"image/" + metadata.Image.Ext + ";base64",
-			base64.StdEncoding.EncodeToString(metadata.Image.Bytes)})
+		raw = append(raw, []string{
+			"image/" + metadata.Image.Ext + ";base64",
+			base64.StdEncoding.EncodeToString(metadata.Image.Bytes),
+		})
 	} else if metadata.Image.DataURI != "" {
 		raw = append(raw, strings.SplitN(metadata.Image.DataURI[5:], ",", 2))
 	}

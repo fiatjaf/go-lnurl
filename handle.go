@@ -2,7 +2,7 @@ package lnurl
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"strings"
 
@@ -72,7 +72,7 @@ func HandleLNURL(rawlnurl string) (string, LNURLParams, error) {
 		return rawurl, nil, err
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return rawurl, nil, err
 	}
